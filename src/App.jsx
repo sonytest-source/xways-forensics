@@ -6,8 +6,8 @@ import artifactguide   from "./artifact_guide";
 
 
 const TABS = [
-  { id: "guide",    label: "📚 학습 가이드",       component: XWaysGuide    },
   { id: "artifact",    label: "📚 아티팩트",       component: artifactguide    },
+  { id: "guide",    label: "📚 학습 가이드",       component: XWaysGuide    },
   { id: "scenario", label: "🔴 침해사고 시나리오", component: XWaysScenario },
   { id: "apt",      label: "🎯 APT 시나리오",      component: APTScenario   },
 ];
