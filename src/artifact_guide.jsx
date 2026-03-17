@@ -538,10 +538,470 @@ const TABS_OTHER = [
 ];
 
 // ══════════════════════════════════════════════════════
+// 레지스트리 하이브 & 키 데이터베이스
+// ══════════════════════════════════════════════════════
+const REG_HIVES = [
+  {
+    id:"sam", name:"SAM", color:"#ff4d6d",
+    path:"C:\\Windows\\System32\\config\\SAM",
+    desc:"로컬 사용자 계정 정보와 패스워드 해시 저장. 운영 중엔 SYSTEM만 접근 가능.",
+    rootKey:"HKLM\\SAM",
+    recmd:"RECmd.exe -f SAM --bn BatchExamples\\SAM.reb --csv output\\",
+    contents:["로컬 사용자 계정 목록","NTLM 패스워드 해시 (암호화)","계정 생성·수정·마지막 로그온 시간","로그인 실패 횟수·잠금 상태","계정 RID (상대 식별자)"],
+  },
+  {
+    id:"system", name:"SYSTEM", color:"#ffd166",
+    path:"C:\\Windows\\System32\\config\\SYSTEM",
+    desc:"시스템 부팅 설정, 서비스, 드라이버, 네트워크, 타임존 등 핵심 시스템 구성.",
+    rootKey:"HKLM\\SYSTEM",
+    recmd:"RECmd.exe -f SYSTEM --bn BatchExamples\\System.reb --csv output\\",
+    contents:["설치된 서비스 목록 (Services)","네트워크 인터페이스 설정","타임존 정보 (분석 시 필수!)","USB/장치 연결 이력 (USBSTOR)","마운트된 볼륨 목록","ControlSet 선택 정보"],
+  },
+  {
+    id:"software", name:"SOFTWARE", color:"#4cc9f0",
+    path:"C:\\Windows\\System32\\config\\SOFTWARE",
+    desc:"설치된 프로그램, 자동실행 항목, Windows 정책, OS 버전 등 소프트웨어 설정.",
+    rootKey:"HKLM\\SOFTWARE",
+    recmd:"RECmd.exe -f SOFTWARE --bn BatchExamples\\Software.reb --csv output\\",
+    contents:["자동실행 Run·RunOnce 키","설치된 프로그램 목록 (Uninstall)","Windows Defender 설정","최근 실행 명령어 (RunMRU)","RDP 설정","보안 정책 (Policies)","OS 버전·빌드 정보"],
+  },
+  {
+    id:"security", name:"SECURITY", color:"#a29bfe",
+    path:"C:\\Windows\\System32\\config\\SECURITY",
+    desc:"도메인 인증 정보, LSA 비밀, 캐시된 도메인 자격증명 저장.",
+    rootKey:"HKLM\\SECURITY",
+    recmd:"RECmd.exe -f SECURITY --bn BatchExamples\\Security.reb --csv output\\",
+    contents:["LSA Secrets (서비스 계정 패스워드)","캐시된 도메인 로그온 자격증명 (DCC2)","도메인 신뢰 관계 정보","감사 정책 설정"],
+  },
+  {
+    id:"ntuser", name:"NTUSER.DAT", color:"#06d6a0",
+    path:"C:\\Users\\<username>\\NTUSER.DAT",
+    desc:"각 사용자별 설정. 최근 문서·실행 프로그램·탐색기 설정·쉘백 등 사용자 행위 기록.",
+    rootKey:"HKCU\\",
+    recmd:"RECmd.exe -f NTUSER.DAT --bn BatchExamples\\NTUser.reb --csv output\\",
+    contents:["사용자 Run·RunOnce 자동실행","최근 열어본 문서 (RecentDocs)","실행한 프로그램 목록 (UserAssist)","검색 기록 (WordWheelQuery)","RDP 접속 이력 (Terminal Server Client)","탐색기 설정·쉘백 (BagMRU)","TypedPaths (주소창 입력 경로)"],
+  },
+  {
+    id:"usrclass", name:"UsrClass.dat", color:"#ffa657",
+    path:"C:\\Users\\<username>\\AppData\\Local\\Microsoft\\Windows\\UsrClass.dat",
+    desc:"사용자 쉘백 데이터의 주요 저장소. 탐색기로 열어본 폴더 전체 이력.",
+    rootKey:"HKCU\\Software\\Classes",
+    recmd:"RECmd.exe -f UsrClass.dat --bn BatchExamples\\UsrClass.reb --csv output\\",
+    contents:["쉘백 (BagMRU) — 탐색기 폴더 접근 이력","ZIP·폴더 내부 탐색 이력","외부 드라이브 탐색 경로"],
+  },
+  {
+    id:"amcache", name:"Amcache.hve", color:"#4ecdc4",
+    path:"C:\\Windows\\AppCompat\\Programs\\Amcache.hve",
+    desc:"실행된 프로그램의 해시·경로·설치시간을 기록. 삭제된 악성파일도 흔적이 남음.",
+    rootKey:"Root\\",
+    recmd:"RECmd.exe -f Amcache.hve --bn BatchExamples\\Amcache.reb --csv output\\",
+    contents:["실행 파일 전체 경로","SHA-1 해시 값 (악성코드 식별 가능)","파일 크기·컴파일 시간","설치·실행 시간","삭제된 파일도 기록 유지"],
+  },
+];
+
+const REG_KEYS = [
+  // ─ 지속성 ─
+  {
+    id:"run", category:"지속성", threat:true, color:"#ff4d6d",
+    name:"Run / RunOnce",
+    hive:"SOFTWARE / NTUSER.DAT",
+    path:"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\nHKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce\nHKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
+    desc:"시스템 시작 또는 사용자 로그온 시 자동으로 실행되는 프로그램을 등록. 악성코드 지속성 확보에 가장 많이 사용.",
+    recmd_plugin:"run",
+    parse_output:`값 이름(Name)          데이터(Data)
+--------------------------------------------------
+WindowsUpdate         C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe /silent
+OneDrive              C:\\Program Files\\OneDrive\\OneDrive.exe /background
+SecurityHealth        C:\\Windows\\System32\\SecurityHealthSystray.exe`,
+    interpretation:[
+      { field:"값 이름(Name)", meaning:"자동실행 항목 식별자. 정상: 알려진 프로그램명 / 의심: 랜덤문자열, 시스템 이름 위장(svchost32, WindowsUpdate 등)" },
+      { field:"데이터(Data)", meaning:"실행될 파일 경로. 정상: Program Files, System32 / 의심: Temp, AppData\\Local, ProgramData, Users\\Public 등 비정상 경로" },
+      { field:"LastWrite 시간", meaning:"키 마지막 수정 시간. 침해 시점과 일치하면 직접 증거" },
+    ],
+    forensic:"경로가 Temp·AppData·ProgramData면 90% 의심. RunOnce는 1회 실행 후 삭제 → 드롭퍼에서 자주 사용.",
+    ioc_example:"C:\\Users\\victim\\AppData\\Local\\Temp\\update.exe\nC:\\ProgramData\\MicrosoftUpdate\\svcupd.exe",
+  },
+  {
+    id:"services", category:"지속성", threat:true, color:"#ff4d6d",
+    name:"Services",
+    hive:"SYSTEM",
+    path:"HKLM\\SYSTEM\\CurrentControlSet\\Services\\<ServiceName>",
+    desc:"설치된 모든 서비스 목록. 악성 서비스 설치로 재부팅 후에도 지속성 확보.",
+    recmd_plugin:"services",
+    parse_output:`서비스명              실행파일 경로                           시작유형    상태
+---------------------------------------------------------------------------------------------
+malware_svc           C:\\Windows\\Temp\\malware_svc.exe          Auto        Running
+wuauserv              C:\\Windows\\System32\\svchost.exe -k netsvcs  Auto      Running
+PSEXESVC              C:\\Windows\\PSEXESVC.exe                   Demand      Stopped`,
+    interpretation:[
+      { field:"서비스명(ServiceName)", meaning:"정상: Microsoft 공식 서비스명 / 의심: 오타나 변형(wuauserv → wuauserv2), 알 수 없는 이름" },
+      { field:"실행파일 경로(ImagePath)", meaning:"정상: System32, SysWOW64 / 의심: Temp, AppData, ProgramData, Users\\Public" },
+      { field:"시작유형(StartType)", meaning:"0=Boot, 1=System, 2=Auto(자동), 3=Demand(수동), 4=Disabled. Auto로 설정 시 부팅마다 실행" },
+      { field:"PSEXESVC", meaning:"PsExec 도구 사용 흔적. 원격 실행 시 자동 생성되는 서비스" },
+    ],
+    forensic:"비정상 경로 + Auto StartType 조합이면 악성 서비스. PSEXESVC 존재 시 PsExec을 통한 측면 이동 의심.",
+    ioc_example:"ImagePath: C:\\Windows\\Temp\\svc.exe\nServiceName: PSEXESVC",
+  },
+  {
+    id:"scheduledtasks_reg", category:"지속성", threat:true, color:"#ff4d6d",
+    name:"예약 작업 (레지스트리)",
+    hive:"SOFTWARE",
+    path:"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\Tasks\nHKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\Tree",
+    desc:"예약 작업의 메타데이터가 레지스트리에도 저장됨. C:\\Windows\\System32\\Tasks\\ 파일과 교차 확인.",
+    recmd_plugin:"scheduledtasks",
+    parse_output:`작업명                        경로                                    마지막 실행
+---------------------------------------------------------------------------------------
+MicrosoftEdgeUpdateCore       \\Microsoft\\Edge\\MicrosoftEdgeUpdateCore   2024-09-02 09:33
+WindowsDefenderScheduledScan  \\Microsoft\\Windows Defender\\...           2024-09-01 03:00
+악성작업_임시               \\악성작업_임시                              2024-09-02 09:33`,
+    interpretation:[
+      { field:"작업명(TaskName)", meaning:"정상: Microsoft 공식 이름 / 의심: 무작위 문자열, Microsoft 이름 위장" },
+      { field:"경로(Path)", meaning:"루트 경로(\\)에 직접 위치한 작업은 의심. 정상은 \\Microsoft\\... 하위" },
+      { field:"마지막 실행(LastRunTime)", meaning:"침해 시간대와 일치하는지 확인" },
+    ],
+    forensic:"경로가 루트(\\)인 작업, 이름이 정상 Microsoft 작업과 유사하게 위장한 것 주의.",
+    ioc_example:"\\MicrosoftEdgeUpdateCore (정상 위장)\n실행파일: C:\\ProgramData\\svcupd.exe",
+  },
+  {
+    id:"winlogon", category:"지속성", threat:true, color:"#ff4d6d",
+    name:"Winlogon",
+    hive:"SOFTWARE",
+    path:"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+    desc:"로그온 프로세스 설정. Userinit·Shell 값 변조로 로그온 시 악성코드 실행 가능.",
+    recmd_plugin:"winlogon",
+    parse_output:`값 이름        정상 값                              현재 값
+-----------------------------------------------------------------------
+Userinit       C:\\Windows\\System32\\userinit.exe,     C:\\Windows\\System32\\userinit.exe, C:\\Temp\\backdoor.exe
+Shell          explorer.exe                          explorer.exe
+AutoAdminLogon 0                                     0`,
+    interpretation:[
+      { field:"Userinit", meaning:"정상: userinit.exe, 만 있어야 함. 추가 항목(쉼표 뒤)은 로그온 시 함께 실행됨 → 즉시 의심" },
+      { field:"Shell", meaning:"정상: explorer.exe / 변조 시: 악성 실행파일로 대체되어 데스크톱 대신 악성코드 실행" },
+      { field:"AutoAdminLogon", meaning:"1이면 자동 로그온 → DefaultUserName·DefaultPassword 값에 자격증명 평문 저장" },
+    ],
+    forensic:"Userinit 값에 쉼표 뒤 추가 경로가 있으면 반드시 확인. Shell 변조는 드물지만 강력한 지속성 기법.",
+    ioc_example:"Userinit: userinit.exe, C:\\Temp\\backdoor.exe",
+  },
+  {
+    id:"appinitdlls", category:"지속성", threat:true, color:"#ff4d6d",
+    name:"AppInit_DLLs",
+    hive:"SOFTWARE",
+    path:"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\\AppInit_DLLs\nHKLM\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Windows\\AppInit_DLLs",
+    desc:"모든 GUI 프로세스 실행 시 지정된 DLL이 자동으로 로드됨. DLL 인젝션 지속성 기법.",
+    recmd_plugin:"appinit",
+    parse_output:`값 이름          데이터
+----------------------------------------------------
+AppInit_DLLs     C:\\Windows\\Temp\\inject.dll
+LoadAppInit_DLLs 1`,
+    interpretation:[
+      { field:"AppInit_DLLs", meaning:"정상: 비어있거나 알려진 보안 소프트웨어 DLL / 의심: 비정상 경로 DLL" },
+      { field:"LoadAppInit_DLLs", meaning:"1이면 AppInit_DLLs 활성화 상태. 기본값 0이어야 정상" },
+    ],
+    forensic:"LoadAppInit_DLLs=1 + 비정상 DLL 경로 → 모든 GUI 프로세스에 악성 DLL 인젝션.",
+    ioc_example:"AppInit_DLLs: C:\\Windows\\Temp\\inject.dll\nLoadAppInit_DLLs: 1",
+  },
+  // ─ 방어 우회 ─
+  {
+    id:"defender", category:"방어우회", threat:true, color:"#ffa657",
+    name:"Windows Defender 비활성화",
+    hive:"SOFTWARE",
+    path:"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\nHKLM\\SOFTWARE\\Microsoft\\Windows Defender\\Features",
+    desc:"Windows Defender(AV) 실시간 보호, 스캔 등을 레지스트리로 비활성화.",
+    recmd_plugin:"defender",
+    parse_output:`키 경로: HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows Defender
+값 이름                      데이터    의미
+---------------------------------------------------------
+DisableAntiSpyware           1         AntiSpyware 비활성화
+DisableAntiVirus             1         AntiVirus 비활성화
+DisableRealtimeMonitoring    1         실시간 보호 비활성화
+DisableBehaviorMonitoring    1         행위 기반 탐지 비활성화
+DisableIOAVProtection        1         다운로드 파일 스캔 비활성화`,
+    interpretation:[
+      { field:"DisableAntiSpyware / DisableAntiVirus", meaning:"1이면 완전 비활성화. 공격자가 가장 먼저 실행하는 방어 우회 조치" },
+      { field:"DisableRealtimeMonitoring", meaning:"실시간 보호 비활성화. 악성코드 실행 전 선행 조치" },
+      { field:"Policies vs Features 키", meaning:"Policies 키의 설정이 우선 적용됨. Features 키만 변경된 경우도 확인 필요" },
+    ],
+    forensic:"이 키의 LastWrite 시간이 악성 파일 드롭 직전이면 공격자가 의도적으로 방어 비활성화한 증거.",
+    ioc_example:"DisableAntiSpyware=1 (LastWrite: 2024-09-02 09:34)",
+  },
+  {
+    id:"uac_bypass", category:"방어우회", threat:true, color:"#ffa657",
+    name:"UAC 우회",
+    hive:"SOFTWARE",
+    path:"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\nHKCU\\SOFTWARE\\Classes\\ms-settings\\shell\\open\\command",
+    desc:"UAC(사용자 계정 컨트롤) 설정 변경 또는 우회 기법 흔적.",
+    recmd_plugin:"uac",
+    parse_output:`키: HKLM\\...\\Policies\\System
+값 이름              데이터    의미
+----------------------------------------------
+EnableLUA            0         UAC 완전 비활성화 ← 위험
+ConsentPromptBehaviorAdmin  0  관리자 승인 없이 권한상승
+PromptOnSecureDesktop 0        보안 데스크톱 없이 승인
+
+키: HKCU\\SOFTWARE\\Classes\\ms-settings\\shell\\open\\command
+DelegateExecute      (비어있음)
+(Default)            cmd.exe /c powershell -ep bypass  ← UAC 우회 페이로드`,
+    interpretation:[
+      { field:"EnableLUA=0", meaning:"UAC 완전 비활성화. 모든 프로그램이 관리자 권한으로 실행됨" },
+      { field:"ms-settings DelegateExecute", meaning:"fodhelper.exe UAC 우회 기법. HKCU 키 생성으로 관리자 없이 권한상승" },
+      { field:"(Default) 값의 명령어", meaning:"UAC 우회 시 실행될 페이로드. PowerShell, cmd 등이 여기에 기록됨" },
+    ],
+    forensic:"ms-settings\\shell\\open\\command 키 존재 자체가 UAC 우회 시도 강력한 증거.",
+    ioc_example:"HKCU\\...\\ms-settings\\shell\\open\\command: cmd.exe /c powershell -ep bypass",
+  },
+  // ─ 사용자 행위 ─
+  {
+    id:"userassist", category:"사용자행위", threat:false, color:"#4cc9f0",
+    name:"UserAssist",
+    hive:"NTUSER.DAT",
+    path:"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\UserAssist\\{GUID}\\Count",
+    desc:"탐색기에서 실행한 프로그램 목록과 실행 횟수·마지막 실행 시간. ROT13 인코딩.",
+    recmd_plugin:"userassist",
+    parse_output:`프로그램명(ROT13 디코딩)                      실행횟수  마지막 실행
+---------------------------------------------------------------------------
+C:\\Windows\\System32\\cmd.exe                     23        2024-09-02 10:02
+C:\\Users\\victim\\AppData\\Local\\Temp\\malware.exe   3         2024-09-02 09:32
+C:\\Program Files\\Google\\Chrome\\chrome.exe         156       2024-09-01 18:45
+Microsoft.Windows.Explorer                         89        2024-09-02 09:00`,
+    interpretation:[
+      { field:"프로그램 경로", meaning:"ROT13 인코딩으로 저장됨. RECmd가 자동 디코딩. 실행 경로 확인 필수" },
+      { field:"실행 횟수(RunCount)", meaning:"비정상적으로 높은 횟수 → 반복 실행 또는 자동화. 1회만 실행 후 삭제된 악성코드도 확인 가능" },
+      { field:"마지막 실행 시간(LastExecuted)", meaning:"침해 시간대와 대조. 파일 삭제 후에도 실행 이력 남음" },
+    ],
+    forensic:"Temp, AppData 경로 프로그램의 실행 횟수와 시간은 악성코드 실행 직접 증거.",
+    ioc_example:"C:\\Users\\victim\\AppData\\Local\\Temp\\malware.exe (실행횟수: 3, 최종: 09:32)",
+  },
+  {
+    id:"recentdocs", category:"사용자행위", threat:false, color:"#4cc9f0",
+    name:"RecentDocs",
+    hive:"NTUSER.DAT",
+    path:"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RecentDocs",
+    desc:"사용자가 최근 열어본 파일 목록. 파일 유형별로 분류되어 저장.",
+    recmd_plugin:"recentdocs",
+    parse_output:`파일명                                    확장자   마지막 접근
+-----------------------------------------------------------------------
+방산청_협력사_공문_2024.docx              .docx    2024-09-02 09:14
+기술_연구_보고서_기밀.pdf                 .pdf     2024-09-03 14:30
+employee_credentials.xlsx                .xlsx    2024-09-04 11:20
+C:\\Staging\\collect.bat                  .bat     2024-09-05 09:00`,
+    interpretation:[
+      { field:"파일명", meaning:"파일 삭제 후에도 MRU 목록에 남음. 공격자가 접근한 파일명 직접 확인" },
+      { field:"확장자별 분류", meaning:"RECmd는 확장자별로 그룹화. .exe .bat .ps1 등 실행 파일 접근 이력 주목" },
+      { field:"마지막 접근 시간", meaning:"LNK 파일과 교차 검증하면 더 강력한 증거" },
+    ],
+    forensic:"기밀문서, 자격증명 파일명이 MRU에 있으면 공격자가 해당 파일을 열람한 직접 증거.",
+    ioc_example:"employee_credentials.xlsx (접근: 2024-09-04 11:20)",
+  },
+  {
+    id:"wordwheelquery", category:"사용자행위", threat:false, color:"#4cc9f0",
+    name:"WordWheelQuery (탐색기 검색)",
+    hive:"NTUSER.DAT",
+    path:"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\WordWheelQuery",
+    desc:"탐색기 검색창에 입력한 검색어 목록. 공격자가 내부 파일 정찰 시 사용.",
+    recmd_plugin:"wordwheelquery",
+    parse_output:`순서  검색어
+------------------------------
+0     password
+1     credential
+2     admin
+3     vpn config
+4     ssh key
+5     .pem
+6     secret`,
+    interpretation:[
+      { field:"검색어(MRUList 순서)", meaning:"최근 순서대로 정렬. 0이 가장 최근" },
+      { field:"검색 내용", meaning:"password, credential, admin, vpn 등 공격자가 민감 정보 탐색 시 사용하는 키워드가 있으면 즉시 의심" },
+    ],
+    forensic:"공격자가 내부 파일 시스템에서 자격증명·키 파일을 검색한 흔적. 타임라인과 연계 분석.",
+    ioc_example:"검색어: password, credential, ssh key, .pem",
+  },
+  {
+    id:"typedpaths", category:"사용자행위", threat:false, color:"#4cc9f0",
+    name:"TypedPaths (주소창 입력)",
+    hive:"NTUSER.DAT",
+    path:"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\TypedPaths",
+    desc:"탐색기 주소창에 직접 타이핑한 경로 목록. 공격자가 직접 접근한 경로 파악.",
+    recmd_plugin:"typedpaths",
+    parse_output:`순서  입력된 경로
+----------------------------------------------
+url1  C:\\Staging
+url2  \\\\192.168.10.20\\C$
+url3  C:\\Windows\\Temp
+url4  C:\\Users\\Administrator`,
+    interpretation:[
+      { field:"입력 경로", meaning:"탐색기에서 직접 타이핑한 경로만 기록. 즐겨찾기·클릭 접근은 포함 안 됨" },
+      { field:"UNC 경로 (\\\\IP\\share)", meaning:"네트워크 공유 직접 접근. 내부 서버 측면 이동 경로 추적에 핵심" },
+    ],
+    forensic:"\\\\IP\\C$ 형태 UNC 경로는 측면 이동 직접 증거. C:\\Staging, C:\\Temp 등 수집 경로도 확인.",
+    ioc_example:"\\\\192.168.10.20\\C$ → 내부 서버 직접 접근",
+  },
+  {
+    id:"rdp_mru", category:"네트워크", threat:true, color:"#4ecdc4",
+    name:"RDP 접속 이력 (MRU)",
+    hive:"NTUSER.DAT",
+    path:"HKCU\\SOFTWARE\\Microsoft\\Terminal Server Client\\Servers\nHKCU\\SOFTWARE\\Microsoft\\Terminal Server Client\\Default",
+    desc:"원격 데스크톱(RDP)으로 접속했던 서버 목록과 사용한 계정명.",
+    recmd_plugin:"terminalserverclient",
+    parse_output:`서버 주소              사용 계정          마지막 접속
+------------------------------------------------------------
+192.168.10.20          Administrator      2024-09-02 11:15
+192.168.10.50          admin              2024-09-05 03:22
+10.0.0.5               victim             2024-09-01 09:00
+RD-SRV-002             domain\\admin       2024-09-02 11:15`,
+    interpretation:[
+      { field:"서버 주소(ServerName)", meaning:"RDP로 접속한 대상 서버. 내부 IP면 측면 이동, 외부 IP면 데이터 유출 서버 의심" },
+      { field:"사용 계정(UsernameHint)", meaning:"접속 시 입력한 계정명. 탈취한 계정(Administrator, admin) 사용 여부 확인" },
+      { field:"MRU 순서", meaning:"Default 키의 MRU0~MRU9로 최근 접속 순서 파악" },
+    ],
+    forensic:"비업무 시간대 내부 서버 RDP + 관리자 계정 사용 조합 → 측면 이동 핵심 증거.",
+    ioc_example:"192.168.10.20 (Administrator, 새벽 03:22)",
+  },
+  {
+    id:"usbstor", category:"네트워크", threat:false, color:"#4ecdc4",
+    name:"USBSTOR (USB 연결 이력)",
+    hive:"SYSTEM",
+    path:"HKLM\\SYSTEM\\CurrentControlSet\\Enum\\USBSTOR",
+    desc:"연결된 USB 저장장치의 정보와 시리얼 번호. 법적으로 특정 USB 기기를 식별하는 핵심 증거.",
+    recmd_plugin:"usbstor",
+    parse_output:`장치 유형              벤더·제품명           시리얼 번호              마지막 연결
+------------------------------------------------------------------------------------------
+Disk&Ven_Samsung&...   Samsung USB Flash      AA9876543210&0          2024-09-02 09:10
+Disk&Ven_Kingston&...  Kingston DataTraveler  001372954C3F34C1&0      2024-09-01 17:30
+Disk&Ven_Generic&...   USB Mass Storage       5&1234abcd&0&00         2024-09-05 22:15`,
+    interpretation:[
+      { field:"장치 유형 문자열", meaning:"Disk&Ven_<벤더>&Prod_<제품>&Rev_<버전> 형식으로 제조사·제품 특정 가능" },
+      { field:"시리얼 번호(SerialNumber)", meaning:"특정 USB 기기를 법적으로 식별하는 고유 값. LNK 파일의 볼륨 시리얼과 교차 확인" },
+      { field:"LastWrite 시간", meaning:"해당 USB가 마지막으로 연결된 시간" },
+    ],
+    forensic:"시리얼 번호로 특정 USB 기기 식별 → 해당 USB 압수 시 직접 증거 연결 가능.",
+    ioc_example:"Samsung USB (SN: AA9876543210) — 침해 시작 직전 연결",
+  },
+  {
+    id:"mounteddevices", category:"네트워크", threat:false, color:"#4ecdc4",
+    name:"MountedDevices",
+    hive:"SYSTEM",
+    path:"HKLM\\SYSTEM\\MountedDevices",
+    desc:"마운트된 볼륨의 드라이브 문자 매핑. USB가 어떤 드라이브 문자로 마운트됐는지 파악.",
+    recmd_plugin:"mounteddevices",
+    parse_output:`드라이브 문자   볼륨 시리얼          장치 유형
+-------------------------------------------------
+C:             {GUID-시스템드라이브}   Fixed Disk
+E:             0xA1B2C3D4            Removable (USB)
+F:             0xE5F6A7B8            Removable (USB)
+\\\\?\\Volume{...}  0xC9D0E1F2          CD-ROM`,
+    interpretation:[
+      { field:"드라이브 문자", meaning:"USB가 E:, F: 등으로 마운트. LNK 파일의 경로와 매핑하면 어떤 USB인지 특정" },
+      { field:"볼륨 시리얼", meaning:"USBSTOR의 시리얼 번호와 연계하여 동일 기기 확인" },
+    ],
+    forensic:"LNK 파일에서 E:\\ 드라이브 경로 발견 → MountedDevices에서 해당 드라이브의 USB 시리얼 확인 → USBSTOR에서 기기 특정.",
+    ioc_example:"E: = 볼륨시리얼 0xA1B2C3D4 → USBSTOR Samsung USB",
+  },
+  {
+    id:"timezone", category:"시스템정보", threat:false, color:"#8b949e",
+    name:"TimeZone (타임존)",
+    hive:"SYSTEM",
+    path:"HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation",
+    desc:"시스템의 타임존 설정. 분석 시작 전 반드시 확인해야 하는 필수 정보.",
+    recmd_plugin:"timezone",
+    parse_output:`값 이름                  데이터
+----------------------------------------------
+TimeZoneKeyName          Korea Standard Time
+ActiveTimeBias           -540  (UTC+9, 단위: 분)
+Bias                     -540
+StandardBias             0
+DaylightBias             -60`,
+    interpretation:[
+      { field:"TimeZoneKeyName", meaning:"타임존 이름. Korea Standard Time = UTC+9" },
+      { field:"ActiveTimeBias", meaning:"UTC 기준 오프셋(분). -540 = UTC+9(한국). 양수면 UTC보다 늦음" },
+      { field:"Bias", meaning:"표준 시간대 오프셋. DaylightBias와 합산하면 서머타임 적용 시간 계산 가능" },
+    ],
+    forensic:"이 값 없이는 이벤트 로그의 시간이 어느 시간대인지 알 수 없음. 분석 시작 전 반드시 기록.",
+    ioc_example:"Bias=-540 → 모든 시간을 UTC+9로 해석해야 함",
+  },
+  {
+    id:"shimcache", category:"실행흔적", threat:false, color:"#ffd166",
+    name:"Shimcache (AppCompatCache)",
+    hive:"SYSTEM",
+    path:"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\AppCompatCache",
+    desc:"실행 가능한 파일의 경로·수정 시간 캐시. 파일이 삭제된 후에도 실행 가능했음을 증명.",
+    recmd_plugin:"appcompatcache",
+    parse_output:`순서  파일 경로                                          수정 시간              실행 여부
+---------------------------------------------------------------------------------------
+0     C:\\Windows\\System32\\cmd.exe                         2024-01-10 12:00        Executed
+1     C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe            2024-09-02 09:32        Executed  ← 의심
+2     C:\\Windows\\Temp\\malware_svc.exe                      2024-09-02 09:35        Executed  ← 의심
+3     C:\\Windows\\System32\\notepad.exe                      2023-06-14 08:00        Not executed`,
+    interpretation:[
+      { field:"파일 경로", meaning:"해당 경로에 실행 가능한 파일이 존재했음을 증명. 파일 삭제 후에도 기록 남음" },
+      { field:"수정 시간", meaning:"파일의 마지막 수정 시간. MFT 타임스탬프와 비교하여 Timestomping 탐지" },
+      { field:"실행 여부(Executed)", meaning:"Windows 8 이후 일부 버전에서만 제공. Executed 표시 시 확실한 실행 증거" },
+    ],
+    forensic:"삭제된 악성 파일도 Shimcache에 경로가 남으면 존재 및 실행 가능성 증명 가능.",
+    ioc_example:"C:\\Windows\\Temp\\malware_svc.exe (Executed, 이후 삭제됨)",
+  },
+  {
+    id:"sam_accounts", category:"계정정보", threat:true, color:"#d2a8ff",
+    name:"SAM 계정 정보",
+    hive:"SAM",
+    path:"HKLM\\SAM\\SAM\\Domains\\Account\\Users",
+    desc:"로컬 사용자 계정의 전체 목록과 계정 상태, 마지막 로그온 시간, 패스워드 해시.",
+    recmd_plugin:"samparse",
+    parse_output:`사용자명         RID    계정상태    생성시간              마지막 로그온           로그인횟수  패스워드 해시(NTLM)
+---------------------------------------------------------------------------------------------------------------
+Administrator    500    활성화      -                     2024-09-02 10:52        147        aad3b435...
+Guest            501    비활성화    -                     Never                   0          -
+admin_bak        1002   활성화      2024-09-02 09:33      2024-09-02 11:20        3          e3d7...  ← 백도어 의심
+kim_finance      1001   활성화      2023-01-15 09:00      2024-09-02 09:00        892        8846...`,
+    interpretation:[
+      { field:"RID (상대 식별자)", meaning:"500=기본 Administrator, 501=Guest, 1000+= 일반 사용자. 1000 이상 계정 중 낯선 것 확인" },
+      { field:"생성 시간", meaning:"침해 시간대에 생성된 계정 → 백도어 계정. 특히 Admin 이름 위장 계정 주의" },
+      { field:"마지막 로그온 시간", meaning:"침해 시간대 관리자 계정 로그온 → 공격자 사용 의심" },
+      { field:"NTLM 해시", meaning:"별도 오프라인 크래킹 도구로 패스워드 복원 가능. aad3b435b51404eeaad3b435b51404ee = 패스워드 없음" },
+    ],
+    forensic:"침해 시간대 생성된 신규 계정(RID 1000+)은 백도어 계정 1순위. 마지막 로그온 시간으로 공격자 사용 여부 확인.",
+    ioc_example:"admin_bak (RID:1002, 생성: 09-02 09:33, 마지막 로그온: 11:20) → 백도어 계정",
+  },
+  {
+    id:"lsa_secrets", category:"계정정보", threat:true, color:"#d2a8ff",
+    name:"LSA Secrets",
+    hive:"SECURITY",
+    path:"HKLM\\SECURITY\\Policy\\Secrets",
+    desc:"서비스 계정 패스워드, 자동 로그온 패스워드, 캐시된 도메인 자격증명 등 저장.",
+    recmd_plugin:"lsasecrets",
+    parse_output:`비밀 이름                의미
+---------------------------------------------------
+_SC_<ServiceName>        서비스 계정 패스워드
+DefaultPassword          자동 로그온 패스워드 (평문)
+CachedDefaultPassword    캐시된 자격증명
+DPAPI_SYSTEM             DPAPI 마스터 키
+NL$KM                    캐시된 도메인 로그온 키 (DCC2)
+$MACHINE.ACC             도메인 컴퓨터 계정 패스워드`,
+    interpretation:[
+      { field:"_SC_<서비스명>", meaning:"해당 서비스가 사용하는 계정의 패스워드. 서비스 계정 탈취에 사용" },
+      { field:"DefaultPassword", meaning:"자동 로그온 설정 시 패스워드가 여기에 저장됨. 평문 또는 간단 암호화" },
+      { field:"NL$KM / CachedDefaultPassword", meaning:"도메인 연결 없이 로그온 가능한 캐시된 자격증명 (DCC2 해시)" },
+    ],
+    forensic:"LSA Secrets 추출은 오프라인 분석(SYSTEM+SECURITY 하이브 동시 필요)에서만 가능. Mimikatz의 주요 탈취 대상.",
+    ioc_example:"DefaultPassword 값 존재 → 평문 패스워드 노출 위험",
+  },
+];
+
+const REG_CATEGORIES = [
+  { id:"all",      label:"전체" },
+  { id:"지속성",   label:"🔴 지속성" },
+  { id:"방어우회", label:"🟠 방어우회" },
+  { id:"사용자행위",label:"🔵 사용자행위" },
+  { id:"네트워크", label:"🟢 네트워크" },
+  { id:"계정정보", label:"🟣 계정정보" },
+  { id:"실행흔적", label:"🟡 실행흔적" },
+  { id:"시스템정보",label:"⚪ 시스템정보" },
+];
+
+// ══════════════════════════════════════════════════════
 // MAIN
 // ══════════════════════════════════════════════════════
 export default function ArtifactGuide() {
-  // 메인 화면 모드: "eventlog" | "artifact"
+  // 메인 화면 모드: "eventlog" | "registry" | "artifact"
   const [mode, setMode]           = useState("eventlog");
 
   // 이벤트 로그 관련
@@ -549,6 +1009,14 @@ export default function ArtifactGuide() {
   const [filterCat, setFilterCat] = useState("all");
   const [filterThreat, setFilterThreat] = useState(false);
   const [selectedEv, setSelectedEv] = useState(null);
+
+  // 레지스트리 관련
+  const [regView, setRegView]     = useState("keys"); // "hives" | "keys"
+  const [regCat, setRegCat]       = useState("all");
+  const [regSearch, setRegSearch] = useState("");
+  const [selectedHive, setSelectedHive] = useState(null);
+  const [selectedKey, setSelectedKey]   = useState(null);
+  const [keyTab, setKeyTab]       = useState("parse");
 
   // 기타 아티팩트 관련
   const [selectedArt, setSelectedArt] = useState(OTHER_ARTIFACTS[0]);
@@ -572,6 +1040,22 @@ export default function ArtifactGuide() {
     return list;
   }, [searchQ, filterCat, filterThreat]);
 
+  // 레지스트리 키 필터링
+  const filteredKeys = useMemo(() => {
+    let list = REG_KEYS;
+    if (regCat !== "all") list = list.filter(k => k.category === regCat);
+    if (regSearch.trim()) {
+      const q = regSearch.toLowerCase();
+      list = list.filter(k =>
+        k.name.toLowerCase().includes(q) ||
+        k.desc.toLowerCase().includes(q) ||
+        k.path.toLowerCase().includes(q) ||
+        k.forensic.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [regCat, regSearch]);
+
   const totalEvents = ALL_EVENTS.length;
   const threatEvents = ALL_EVENTS.filter(e => e.threat).length;
 
@@ -579,21 +1063,28 @@ export default function ArtifactGuide() {
     <div style={{ minHeight:"100vh", maxWidth:480, margin:"0 auto", background:"#010409", fontFamily:"'Noto Sans KR','Segoe UI',sans-serif", color:"#e6edf3", display:"flex", flexDirection:"column" }}>
 
       {/* ── 최상단 모드 탭 ── */}
-      <div style={{ background:"#0d1117", borderBottom:"1px solid #21262d", padding:"10px 14px", display:"flex", gap:8, position:"sticky", top:0, zIndex:60 }}>
+      <div style={{ background:"#0d1117", borderBottom:"1px solid #21262d", padding:"8px 12px", display:"flex", gap:6, position:"sticky", top:0, zIndex:60 }}>
         <button onClick={() => setMode("eventlog")} style={{
-          flex:1, padding:"9px 8px", borderRadius:9, border:"none", cursor:"pointer",
+          flex:1, padding:"8px 4px", borderRadius:8, border:"none", cursor:"pointer",
           background:mode==="eventlog"?"#4cc9f033":"#161b22",
           color:mode==="eventlog"?"#4cc9f0":"#8b949e",
           border:`1px solid ${mode==="eventlog"?"#4cc9f055":"#30363d"}`,
-          fontSize:12, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", gap:5,
-        }}>📋 이벤트 로그 DB</button>
+          fontSize:11, fontWeight:700, display:"flex", flexDirection:"column", alignItems:"center", gap:1,
+        }}><span style={{fontSize:14}}>📋</span>이벤트 로그</button>
+        <button onClick={() => setMode("registry")} style={{
+          flex:1, padding:"8px 4px", borderRadius:8, border:"none", cursor:"pointer",
+          background:mode==="registry"?"#d2a8ff33":"#161b22",
+          color:mode==="registry"?"#d2a8ff":"#8b949e",
+          border:`1px solid ${mode==="registry"?"#d2a8ff55":"#30363d"}`,
+          fontSize:11, fontWeight:700, display:"flex", flexDirection:"column", alignItems:"center", gap:1,
+        }}><span style={{fontSize:14}}>🗝</span>레지스트리</button>
         <button onClick={() => setMode("artifact")} style={{
-          flex:1, padding:"9px 8px", borderRadius:9, border:"none", cursor:"pointer",
+          flex:1, padding:"8px 4px", borderRadius:8, border:"none", cursor:"pointer",
           background:mode==="artifact"?"#06d6a033":"#161b22",
           color:mode==="artifact"?"#06d6a0":"#8b949e",
           border:`1px solid ${mode==="artifact"?"#06d6a055":"#30363d"}`,
-          fontSize:12, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", gap:5,
-        }}>🗂 아티팩트 가이드</button>
+          fontSize:11, fontWeight:700, display:"flex", flexDirection:"column", alignItems:"center", gap:1,
+        }}><span style={{fontSize:14}}>🗂</span>아티팩트</button>
       </div>
 
       {/* ══════════════ 이벤트 로그 DB 모드 ══════════════ */}
@@ -717,6 +1208,216 @@ export default function ArtifactGuide() {
               </>
             )}
           </div>
+        </>
+      )}
+
+      {/* ══════════════ 레지스트리 모드 ══════════════ */}
+      {mode === "registry" && (
+        <>
+          {/* 서브 뷰 탭 */}
+          <div style={{ background:"#0d1117", borderBottom:"1px solid #21262d", display:"flex", gap:0, position:"sticky", top:49, zIndex:50 }}>
+            <button onClick={() => setRegView("hives")} style={{
+              flex:1, padding:"10px 8px", border:"none", cursor:"pointer", background:"none",
+              color:regView==="hives"?"#d2a8ff":"#8b949e",
+              borderBottom:`2px solid ${regView==="hives"?"#d2a8ff":"transparent"}`,
+              fontSize:12, fontWeight:regView==="hives"?700:400,
+            }}>💾 하이브 파일 구조</button>
+            <button onClick={() => setRegView("keys")} style={{
+              flex:1, padding:"10px 8px", border:"none", cursor:"pointer", background:"none",
+              color:regView==="keys"?"#d2a8ff":"#8b949e",
+              borderBottom:`2px solid ${regView==="keys"?"#d2a8ff":"transparent"}`,
+              fontSize:12, fontWeight:regView==="keys"?700:400,
+            }}>🔑 핵심 키 & 파싱 결과</button>
+          </div>
+
+          {/* ── 하이브 파일 구조 뷰 ── */}
+          {regView === "hives" && (
+            <div style={{ flex:1, padding:14, paddingBottom:20 }}>
+              <div style={{ background:"#d2a8ff10", border:"1px solid #d2a8ff33", borderRadius:10, padding:"12px 14px", marginBottom:14 }}>
+                <div style={{ color:"#d2a8ff", fontWeight:700, fontSize:12, marginBottom:6 }}>🗝 레지스트리란?</div>
+                <div style={{ color:"#e6edf3", fontSize:12, lineHeight:1.7 }}>Windows의 모든 설정을 저장하는 계층형 데이터베이스. 여러 개의 <strong style={{color:"#d2a8ff"}}>하이브(Hive) 파일</strong>로 구성되며, 각 파일마다 저장하는 정보가 다릅니다. 포렌식에서는 이 파일들을 오프라인으로 직접 로드하여 분석합니다.</div>
+              </div>
+
+              {REG_HIVES.map(hive => (
+                <div key={hive.id} onClick={() => setSelectedHive(selectedHive?.id===hive.id?null:hive)} style={{
+                  background: selectedHive?.id===hive.id ? hive.color+"15" : "#161b22",
+                  border:`1px solid ${selectedHive?.id===hive.id ? hive.color+"55" : "#21262d"}`,
+                  borderLeft:`4px solid ${hive.color}`,
+                  borderRadius:10, padding:"13px 14px", marginBottom:8, cursor:"pointer",
+                }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                    <span style={{ background:hive.color+"22", color:hive.color, borderRadius:6, padding:"3px 9px", fontFamily:"monospace", fontSize:12, fontWeight:800 }}>{hive.name}</span>
+                    <span style={{ color:"#8b949e", fontSize:10 }}>{hive.rootKey}</span>
+                    <span style={{ marginLeft:"auto", color:"#444c56", fontSize:14 }}>{selectedHive?.id===hive.id?"▲":"▼"}</span>
+                  </div>
+                  <div style={{ color:"#e6edf3", fontSize:12, lineHeight:1.5, marginBottom:selectedHive?.id===hive.id?8:0 }}>{hive.desc}</div>
+
+                  {selectedHive?.id===hive.id && (
+                    <div style={{ marginTop:10 }}>
+                      {/* 파일 경로 */}
+                      <div style={{ background:"#0d1117", border:"1px solid #21262d", borderRadius:8, padding:"10px 12px", marginBottom:8 }}>
+                        <div style={{ color:"#8b949e", fontSize:10, marginBottom:5 }}>📍 파일 경로</div>
+                        <code style={{ color:hive.color, fontSize:11, fontFamily:"monospace", wordBreak:"break-all" }}>{hive.path}</code>
+                      </div>
+                      {/* 저장 내용 */}
+                      <div style={{ background:"#0d1117", border:"1px solid #21262d", borderRadius:8, padding:"10px 12px", marginBottom:8 }}>
+                        <div style={{ color:"#8b949e", fontSize:10, marginBottom:8 }}>📦 저장 내용</div>
+                        {hive.contents.map((c,i) => (
+                          <div key={i} style={{ display:"flex", gap:8, marginBottom:5 }}>
+                            <span style={{ color:hive.color, fontSize:11, flexShrink:0 }}>▸</span>
+                            <span style={{ color:"#e6edf3", fontSize:11, lineHeight:1.5 }}>{c}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {/* RECmd 명령어 */}
+                      <div style={{ background:"#0d1117", border:"1px solid #06d6a033", borderRadius:8, padding:"10px 12px" }}>
+                        <div style={{ color:"#06d6a0", fontSize:10, marginBottom:6 }}>🛠 RECmd 파싱 명령어</div>
+                        <code style={{ display:"block", color:"#06d6a0", fontSize:10, fontFamily:"monospace", wordBreak:"break-all", lineHeight:1.6 }}>{hive.recmd}</code>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* 분석 순서 팁 */}
+              <div style={{ background:"#ffd16610", border:"1px solid #ffd16630", borderRadius:10, padding:"13px 14px", marginTop:6 }}>
+                <div style={{ color:"#ffd166", fontWeight:700, fontSize:12, marginBottom:8 }}>💡 하이브 분석 순서 (권장)</div>
+                {["① SYSTEM → 타임존 확인 (분석 시작 전 필수!)", "② SAM → 로컬 계정·백도어 계정 확인", "③ SOFTWARE → Run키·서비스·설치 프로그램", "④ SECURITY → LSA Secrets·캐시 자격증명", "⑤ NTUSER.DAT → 사용자별 행위 분석", "⑥ UsrClass.dat → 쉘백 분석", "⑦ Amcache.hve → 실행 파일 해시 확인"].map((t,i) => (
+                  <div key={i} style={{ color:"#e6edf3", fontSize:12, lineHeight:1.8 }}>{t}</div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── 핵심 키 & 파싱 결과 뷰 ── */}
+          {regView === "keys" && (
+            <>
+              {/* 검색 & 필터 */}
+              <div style={{ background:"#0d1117", borderBottom:"1px solid #21262d", padding:"10px 12px", position:"sticky", top:97, zIndex:40 }}>
+                <div style={{ position:"relative", marginBottom:8 }}>
+                  <span style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", fontSize:13 }}>🔍</span>
+                  <input value={regSearch} onChange={e=>setRegSearch(e.target.value)}
+                    placeholder="키 이름, 경로, 설명 검색..."
+                    style={{ width:"100%", padding:"8px 10px 8px 30px", background:"#161b22", border:"1px solid #30363d", borderRadius:8, color:"#e6edf3", fontSize:12, outline:"none", boxSizing:"border-box" }}
+                  />
+                  {regSearch && <button onClick={()=>setRegSearch("")} style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#8b949e", cursor:"pointer", fontSize:13 }}>✕</button>}
+                </div>
+                <div style={{ display:"flex", overflowX:"auto", gap:5 }}>
+                  {REG_CATEGORIES.map(cat => (
+                    <button key={cat.id} onClick={()=>setRegCat(cat.id)} style={{
+                      padding:"4px 10px", borderRadius:20, border:"none", cursor:"pointer", flexShrink:0,
+                      background:regCat===cat.id?"#d2a8ff33":"#21262d",
+                      color:regCat===cat.id?"#d2a8ff":"#8b949e",
+                      border:`1px solid ${regCat===cat.id?"#d2a8ff55":"#30363d"}`,
+                      fontSize:10, fontWeight:700,
+                    }}>{cat.label}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 키 목록 */}
+              <div style={{ flex:1, padding:"10px 14px", paddingBottom:20 }}>
+                {filteredKeys.length === 0 ? (
+                  <div style={{ textAlign:"center", padding:"40px 20px", color:"#8b949e" }}>
+                    <div style={{ fontSize:36, marginBottom:10 }}>🔍</div>
+                    <div>검색 결과 없음</div>
+                  </div>
+                ) : filteredKeys.map(key => (
+                  <button key={key.id} onClick={()=>{setSelectedKey(key); setKeyTab("parse");}} style={{
+                    width:"100%", textAlign:"left",
+                    background:key.threat?"#ff4d6d08":"#161b22",
+                    border:`1px solid ${key.threat?"#ff4d6d33":"#21262d"}`,
+                    borderLeft:`4px solid ${key.color}`,
+                    borderRadius:10, padding:"12px 13px", marginBottom:7, cursor:"pointer",
+                    display:"flex", gap:10, alignItems:"flex-start",
+                  }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4, flexWrap:"wrap" }}>
+                        <span style={{ color:key.color, fontWeight:800, fontSize:13 }}>{key.name}</span>
+                        <span style={{ background:key.color+"22", color:key.color, borderRadius:10, padding:"1px 7px", fontSize:9, fontWeight:700 }}>{key.category}</span>
+                        {key.threat && <span style={{ background:"#ff4d6d22", color:"#ff4d6d", borderRadius:4, padding:"1px 5px", fontSize:9, fontWeight:700 }}>⚠ 위협</span>}
+                      </div>
+                      <div style={{ color:"#8b949e", fontSize:11, lineHeight:1.5 }}>{key.desc}</div>
+                      <div style={{ color:"#444c56", fontSize:10, fontFamily:"monospace", marginTop:4, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{key.hive}</div>
+                    </div>
+                    <span style={{ color:"#444c56", fontSize:14, flexShrink:0 }}>›</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* ── 키 상세 바텀시트 ── */}
+          {selectedKey && (
+            <div onClick={()=>setSelectedKey(null)} style={{ position:"fixed", inset:0, background:"#00000090", zIndex:200, display:"flex", alignItems:"flex-end" }}>
+              <div onClick={e=>e.stopPropagation()} style={{ background:"#161b22", border:`1px solid ${selectedKey.color}44`, borderRadius:"16px 16px 0 0", padding:"18px 16px", width:"100%", maxWidth:480, margin:"0 auto", maxHeight:"88vh", overflowY:"auto" }}>
+                <div style={{ width:36, height:4, background:"#30363d", borderRadius:2, margin:"0 auto 14px" }}/>
+
+                {/* 헤더 */}
+                <div style={{ display:"flex", alignItems:"flex-start", gap:10, marginBottom:12 }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:5 }}>
+                      <span style={{ background:selectedKey.color+"22", color:selectedKey.color, borderRadius:6, padding:"2px 9px", fontSize:12, fontWeight:800 }}>{selectedKey.name}</span>
+                      <span style={{ background:selectedKey.color+"15", color:selectedKey.color, borderRadius:10, padding:"2px 7px", fontSize:10 }}>{selectedKey.category}</span>
+                      {selectedKey.threat && <span style={{ background:"#ff4d6d22", color:"#ff4d6d", borderRadius:4, padding:"2px 7px", fontSize:10, fontWeight:700 }}>⚠ 위협 지표</span>}
+                    </div>
+                    <div style={{ color:"#e6edf3", fontSize:13, lineHeight:1.6 }}>{selectedKey.desc}</div>
+                  </div>
+                </div>
+
+                {/* 경로 */}
+                <div style={{ background:"#0d1117", border:"1px solid #21262d", borderRadius:8, padding:"10px 12px", marginBottom:10 }}>
+                  <div style={{ color:"#8b949e", fontSize:10, marginBottom:5 }}>📍 레지스트리 경로</div>
+                  <code style={{ color:selectedKey.color, fontSize:10, fontFamily:"monospace", wordBreak:"break-all", whiteSpace:"pre-line", lineHeight:1.7 }}>{selectedKey.path}</code>
+                </div>
+
+                {/* 탭 */}
+                <div style={{ display:"flex", gap:0, marginBottom:12, borderBottom:"1px solid #21262d" }}>
+                  {[{id:"parse",label:"📊 파싱 결과 예시"},{id:"interpret",label:"🔎 필드 해석"},{id:"forensic",label:"🕵️ 포렌식 활용"}].map(t => (
+                    <button key={t.id} onClick={()=>setKeyTab(t.id)} style={{ flex:1, padding:"9px 4px", border:"none", cursor:"pointer", background:"none", color:keyTab===t.id?selectedKey.color:"#8b949e", borderBottom:`2px solid ${keyTab===t.id?selectedKey.color:"transparent"}`, fontSize:10, fontWeight:keyTab===t.id?700:400 }}>{t.label}</button>
+                  ))}
+                </div>
+
+                {/* 탭 콘텐츠 */}
+                {keyTab==="parse" && (
+                  <div>
+                    <div style={{ color:"#8b949e", fontSize:11, marginBottom:6 }}>
+                      🛠 RECmd 플러그인: <code style={{ color:"#06d6a0", fontFamily:"monospace" }}>{selectedKey.recmd_plugin}</code>
+                    </div>
+                    <div style={{ background:"#0d1117", border:"1px solid #30363d", borderRadius:8, padding:"12px", overflowX:"auto" }}>
+                      <pre style={{ color:"#e6edf3", fontSize:10, fontFamily:"monospace", margin:0, lineHeight:1.8, whiteSpace:"pre-wrap", wordBreak:"break-all" }}>{selectedKey.parse_output}</pre>
+                    </div>
+                  </div>
+                )}
+
+                {keyTab==="interpret" && (
+                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                    {selectedKey.interpretation.map((item,i) => (
+                      <div key={i} style={{ background:"#0d1117", border:"1px solid #21262d", borderRadius:8, padding:"11px 13px" }}>
+                        <div style={{ color:selectedKey.color, fontWeight:700, fontSize:11, fontFamily:"monospace", marginBottom:5 }}>{item.field}</div>
+                        <div style={{ color:"#e6edf3", fontSize:12, lineHeight:1.6 }}>{item.meaning}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {keyTab==="forensic" && (
+                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                    <div style={{ background:"#ffd16610", border:"1px solid #ffd16630", borderLeft:"3px solid #ffd166", borderRadius:8, padding:"11px 13px" }}>
+                      <div style={{ color:"#ffd166", fontWeight:700, fontSize:11, marginBottom:5 }}>🕵️ 포렌식 분석 포인트</div>
+                      <div style={{ color:"#e6edf3", fontSize:12, lineHeight:1.7 }}>{selectedKey.forensic}</div>
+                    </div>
+                    <div style={{ background:"#ff4d6d0d", border:"1px solid #ff4d6d33", borderLeft:"3px solid #ff4d6d", borderRadius:8, padding:"11px 13px" }}>
+                      <div style={{ color:"#ff4d6d", fontWeight:700, fontSize:11, marginBottom:5 }}>🚨 IOC 예시</div>
+                      <pre style={{ color:"#ff7b7b", fontSize:11, fontFamily:"monospace", margin:0, lineHeight:1.8, whiteSpace:"pre-wrap" }}>{selectedKey.ioc_example}</pre>
+                    </div>
+                  </div>
+                )}
+
+                <button onClick={()=>setSelectedKey(null)} style={{ width:"100%", background:"#21262d", border:"none", borderRadius:9, padding:"12px", cursor:"pointer", color:"#e6edf3", fontSize:13, fontWeight:700, marginTop:12 }}>닫기</button>
+              </div>
+            </div>
+          )}
         </>
       )}
 
