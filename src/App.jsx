@@ -13,7 +13,7 @@ const TABS = [
 ];
 
 export default function App() {
-  const [tab, setTab] = useState("guide");
+  const [tab, setTab] = useState("artifact");
   const Active = TABS.find(t => t.id === tab).component;
 
   return (
