@@ -372,170 +372,590 @@ const ALL_EVENTS = EVENT_CATEGORIES.flatMap(cat =>
 );
 
 // ══════════════════════════════════════════════════════
-// 기타 아티팩트 데이터
+// 아티팩트 상세 데이터
 // ══════════════════════════════════════════════════════
-const OTHER_ARTIFACTS = [
+const ARTIFACTS_DETAIL = [
   {
-    id: "registry", icon: "🗝", name: "레지스트리", subtitle: "Registry",
-    color: "#d2a8ff", category: "설정",
-    location: "C:\\Windows\\System32\\config\\\nC:\\Users\\<user>\\NTUSER.DAT",
-    files: ["SAM", "SYSTEM", "SOFTWARE", "SECURITY", "NTUSER.DAT"],
-    tools: ["Registry Explorer", "RegRipper", "regedit"],
-    summary: "공격자의 지속성 확보·설정 변조 흔적이 남는 Windows 설정 데이터베이스.",
-    whatYouCanFind: "자동 실행 프로그램, 최근 접근 파일, USB 연결 이력, 설치된 서비스, 사용자 계정 정보",
-    keyEvents: [
-      { id: "Run / RunOnce", desc: "시작 시 자동 실행 → 악성코드 지속성", threat: true },
-      { id: "Services", desc: "설치된 서비스 목록 → 악성 서비스 탐지", threat: true },
-      { id: "SAM", desc: "로컬 사용자 계정 및 패스워드 해시", threat: true },
-      { id: "UserAssist", desc: "사용자가 실행한 프로그램 이력", threat: false },
-      { id: "RecentDocs", desc: "최근 열어본 파일 목록", threat: false },
-      { id: "MountedDevices", desc: "USB·외장드라이브 연결 이력", threat: false },
-      { id: "Shimcache", desc: "실행 가능 파일 캐시 (삭제 후에도 흔적)", threat: false },
-      { id: "Amcache.hve", desc: "실행된 파일의 해시·경로·시간", threat: false },
+    id:"prefetch", icon:"⚡", name:"프리패치", subtitle:"Prefetch",
+    color:"#ffd166", category:"실행흔적",
+    summary:"프로그램 로딩 속도 향상을 위해 Windows가 자동 생성하는 파일. 실행 파일 이름·실행 횟수·최근 8회 실행 시간·접근한 파일 목록을 담고 있어 삭제된 악성 파일의 실행도 증명 가능.",
+    locations:[
+      { path:"C:\\Windows\\Prefetch\\", desc:"모든 .pf 파일 저장 위치" },
+      { path:"파일명 형식: <실행파일명>-<해시8자리>.pf", desc:"예: POWERSHELL.EXE-AB12CD34.pf" },
     ],
-    tips: [
-      "HKLM\\...\\CurrentVersion\\Run 최우선 확인",
-      "Shimcache·Amcache로 삭제된 악성 파일 증명",
-      "SAM으로 로컬 계정 목록과 마지막 로그온 시간 확인",
-      "SYSTEM 하이브 타임존을 먼저 파악해야 시간 분석 정확",
+    tools:[
+      { name:"PECmd", desc:"Eric Zimmerman 도구. CSV/JSON 출력 지원. 가장 많이 사용", cmd:"PECmd.exe -d C:\\Windows\\Prefetch --csv output\\ --csvf prefetch.csv" },
+      { name:"WinPrefetchView", desc:"GUI 도구. 직관적이나 일괄 처리 불가" },
+      { name:"Autopsy", desc:"통합 포렌식 플랫폼 — Prefetch 자동 파싱" },
+    ],
+    keyItems:[
+      {
+        name:"실행 파일 경로 & 이름", threat:true,
+        desc:"PF 파일에서 원본 실행 파일의 전체 경로와 이름을 추출.",
+        parse_output:`Source Name                          Source Created          Source Modified        Run Count  Last Run                 Volume Path
+---------------------------------------------------------------------------------------------------------------------------
+MIMIKATZ.EXE-3B7D2F1A.pf            2024-09-02 10:44        2024-09-02 10:44       1          2024-09-02 10:44         \\VOLUME{...}\\
+SVCUPD.EXE-C4F8A2E1.pf              2024-09-02 09:32        2024-09-02 09:32       5          2024-09-02 11:30         \\VOLUME{...}\\
+POWERSHELL.EXE-7EC4A3D2.pf          2023-01-10 08:00        2024-09-02 09:31       47         2024-09-02 09:31         \\VOLUME{...}\\`,
+        interpretation:[
+          { field:"Source Name (파일명)", meaning:"PF 파일명에서 실행 파일명 추출. MIMIKATZ, PROCDUMP, METERPRETER, COBALTSTRIKE 등 공격 도구명 직접 검색" },
+          { field:"Run Count (실행 횟수)", meaning:"총 실행 횟수. 1회면 최초 실행 후 삭제 의심. 수십 회면 자동 재실행 또는 스크립트에서 반복 호출" },
+          { field:"Last Run (최근 실행 시간)", meaning:"가장 최근 실행 시간. 침해 시간대와 대조. 파일이 삭제된 후에도 PF 파일이 남으면 실행 사실 증명 가능" },
+          { field:"Source Created (PF 생성 시간)", meaning:"처음 실행된 시간과 동일. 악성코드 최초 실행 시점 특정" },
+          { field:"Volume Path", meaning:"실행 당시 마운트된 볼륨 경로. USB 실행이면 이동식 볼륨 경로 기록" },
+        ],
+        forensic:"삭제된 악성 파일도 PF 파일이 남아 있으면 실행 사실을 증명할 수 있다. 파일을 지워도 증거는 남는다.",
+        ioc:"C:\\Windows\\Temp, C:\\ProgramData, C:\\Users\\...\\AppData\\Local\\Temp 경로 .exe 실행 이력",
+      },
+      {
+        name:"최근 8회 실행 시간", threat:false,
+        desc:"Windows Vista 이후 최근 8회 실행 시간이 모두 기록됨. 공격 빈도와 패턴 파악 가능.",
+        parse_output:`파일명: SVCUPD.EXE-C4F8A2E1.pf
+Run 1: 2024-09-02 09:32:11 UTC
+Run 2: 2024-09-02 09:35:44 UTC
+Run 3: 2024-09-02 10:18:03 UTC
+Run 4: 2024-09-03 00:00:01 UTC  ← 자동 재실행 패턴 (자정)
+Run 5: 2024-09-04 00:00:02 UTC
+Run 6: 2024-09-05 00:00:01 UTC
+Run 7: 2024-09-06 00:00:03 UTC
+Run 8: 2024-09-07 00:00:01 UTC`,
+        interpretation:[
+          { field:"실행 간격 패턴", meaning:"일정 간격(매일 자정 등) 반복 실행 → 예약 작업 또는 자동 재실행 메커니즘 존재" },
+          { field:"실행 시간대", meaning:"새벽 시간대 집중 실행 → 사람이 직접 실행한 것이 아닌 자동화 의심" },
+          { field:"첫 실행 vs 마지막 실행 간격", meaning:"짧으면 단순 테스트 / 길면 장기간 지속 활동" },
+        ],
+        forensic:"규칙적 실행 패턴(매일 00:00:01)은 예약 작업을 통한 지속성 확보. 이벤트 로그 4698(예약 작업 생성)과 교차 확인.",
+        ioc:"매일 자정 정각 실행, 업무 시간 외 새벽 반복 실행 패턴",
+      },
+      {
+        name:"접근 파일 목록", threat:true,
+        desc:"해당 프로그램이 실행되면서 접근(읽기·쓰기)한 파일 목록. 악성코드의 행동 반경 파악 핵심.",
+        parse_output:`파일명: MIMIKATZ.EXE-3B7D2F1A.pf  접근 파일 목록:
+\\WINDOWS\\SYSTEM32\\LSASS.EXE        ← 자격증명 덤프 대상
+\\WINDOWS\\SYSTEM32\\NTDLL.DLL
+\\WINDOWS\\SYSTEM32\\CRYPTDLL.DLL
+\\WINDOWS\\TEMP\\LSS.DMP             ← 덤프 파일 생성 경로
+\\PROGRAMDATA\\MICROSOFTUPDATE\\SVCUPD.CFG  ← C2 설정 파일 접근`,
+        interpretation:[
+          { field:"lsass.exe 접근", meaning:"자격증명 탈취 시도. Mimikatz, ProcDump 등이 LSASS 프로세스 메모리에 접근 시 기록" },
+          { field:".dmp 파일 접근", meaning:"메모리 덤프 파일 생성 또는 읽기. 덤프 파일 경로와 이름이 직접 기록됨" },
+          { field:"비정상 설정 파일 접근", meaning:"C2 설정·암호화 키·페이로드 파일에 접근한 흔적. 악성코드 동작 방식 파악 가능" },
+          { field:"네트워크 드라이브 경로", meaning:"\\\\서버\\공유 형태 경로가 있으면 네트워크를 통한 파일 접근 또는 측면 이동" },
+        ],
+        forensic:"접근 파일 목록으로 악성코드가 무엇을 했는지 역추적 가능. 설정 파일·덤프 파일 경로를 MFT에서 추가 확인.",
+        ioc:"LSASS.EXE 접근, .dmp 파일 생성, \\\\내부서버\\공유 경로 접근",
+      },
+    ],
+    tips:[
+      "Windows Server는 기본적으로 Prefetch 비활성화 → EnablePrefetcher=3으로 활성화 여부 레지스트리 확인",
+      "SSD 환경에서도 PF 파일은 생성됨 (ReadyBoost 정책과 무관)",
+      "같은 파일명이라도 경로가 다르면 해시값이 다른 별도 PF 파일 생성",
+      "PECmd -d 옵션으로 폴더 전체 일괄 파싱 → CSV 출력 후 Excel 필터 활용",
+      "악성코드가 PF 파일을 삭제해도 $UsnJrnl에 삭제 이벤트 기록 남음",
     ],
   },
   {
-    id: "prefetch", icon: "⚡", name: "프리패치", subtitle: "Prefetch",
-    color: "#ffd166", category: "실행흔적",
-    location: "C:\\Windows\\Prefetch\\",
-    files: ["*.pf (예: POWERSHELL.EXE-XXXXXXXX.pf)"],
-    tools: ["PECmd", "WinPrefetchView", "Autopsy"],
-    summary: "실행 흔적 분석의 핵심. 삭제된 악성 파일도 실행 사실을 증명할 수 있다.",
-    whatYouCanFind: "실행된 프로그램 이름, 실행 횟수, 최근 8회 실행 시간, 접근한 파일 목록",
-    keyEvents: [
-      { id: "실행 횟수", desc: "비정상적으로 높으면 → 자동화 공격", threat: true },
-      { id: "실행 경로", desc: "Temp, AppData 비정상 경로 → 즉시 의심", threat: true },
-      { id: "접근 파일 목록", desc: "악성코드가 읽은 파일 목록 재구성", threat: false },
-      { id: "타임스탬프", desc: "최근 8회 실행 시간 → 타임라인 구성", threat: false },
-      { id: "삭제된 파일", desc: "PF 파일 존재 시 실행 사실 증명 가능", threat: false },
+    id:"mft", icon:"📁", name:"$MFT · $LogFile · $UsnJrnl", subtitle:"NTFS 파일시스템 메타데이터 3종",
+    color:"#06d6a0", category:"파일시스템",
+    summary:"NTFS 파일시스템의 핵심 3대 메타데이터. $MFT는 모든 파일의 레코드 DB, $LogFile은 파일시스템 트랜잭션 로그, $UsnJrnl은 파일 변경 이벤트 저널이다. 삭제된 파일, 시간 조작, 흔적 삭제 탐지의 핵심 아티팩트.",
+    locations:[
+      { path:"C:\\$MFT", desc:"NTFS 마스터 파일 테이블 — 볼륨 내 모든 파일·폴더 레코드 (1레코드=1024bytes)" },
+      { path:"C:\\$MFTMirr", desc:"$MFT 앞 4개 레코드의 백업 — 복구 용도" },
+      { path:"C:\\$LogFile", desc:"NTFS 트랜잭션 로그 — 파일시스템 변경 내역. 최대 수십 MB, 빠르게 롤오버" },
+      { path:"C:\\$Extend\\$UsnJrnl", desc:"파일 변경 저널 메인 파일" },
+      { path:"C:\\$Extend\\$UsnJrnl:$J", desc:"$UsnJrnl의 실제 저널 데이터 스트림 (대용량, 포렌식 수집 대상)" },
+      { path:"C:\\$Extend\\$UsnJrnl:$Max", desc:"저널 최대 크기 및 할당 델타 설정 스트림" },
+      { path:"C:\\$Bitmap", desc:"클러스터 사용/미사용 현황 비트맵 — 파일 카빙 시 참조" },
+      { path:"C:\\$Boot", desc:"볼륨 부트 레코드 — NTFS 버전·클러스터 크기·$MFT 위치 등 기록" },
     ],
-    tips: [
-      "C:\\Temp, AppData\\Local\\Temp .exe → 즉시 의심",
-      "mimikatz, procdump, meterpreter 이름 직접 검색",
-      "삭제됐어도 PF 파일 있으면 실행 증명 가능",
-      "Windows Server는 기본 Prefetch 비활성화 → 없어도 정상",
+    tools:[
+      { name:"MFTECmd ($MFT)", desc:"Eric Zimmerman. $MFT 전체 파싱. CSV/JSON 출력", cmd:"MFTECmd.exe -f \"C:\\$MFT\" --csv output\\ --csvf mft.csv" },
+      { name:"MFTECmd ($J 스트림)", desc:"$UsnJrnl 저널 파싱. 파일 변경 이벤트 전체 추출", cmd:"MFTECmd.exe -f \"C:\\$Extend\\$UsnJrnl:$J\" --csv output\\ --csvf usnjrnl.csv" },
+      { name:"MFTECmd ($LogFile)", desc:"$LogFile 트랜잭션 파싱", cmd:"MFTECmd.exe -f \"C:\\$LogFile\" --csv output\\ --csvf logfile.csv" },
+      { name:"MFTECmd (--body)", desc:"log2timeline 형식으로 타임라인 통합 출력", cmd:"MFTECmd.exe -f \"C:\\$MFT\" --body output\\ --bodyf mft_body.txt" },
+      { name:"Autopsy", desc:"MFT 자동 파싱 + 타임라인 뷰 + 삭제 파일 복구 통합 제공" },
+      { name:"Velociraptor", desc:"라이브 수집 및 원격 MFT 분석. NTFS artifact 활용", cmd:"velociraptor artifacts collect Windows.NTFS.MFT" },
+    ],
+    // keyItems에 파일별 섹션 구분 플래그 추가
+    fileSections:[
+      { id:"mft_main", label:"📄 $MFT", color:"#06d6a0" },
+      { id:"logfile",  label:"📝 $LogFile", color:"#4cc9f0" },
+      { id:"usnjrnl",  label:"📋 $UsnJrnl", color:"#ffd166" },
+    ],
+    keyItems:[
+      // ── $MFT 항목 ──
+      {
+        file:"$MFT",
+        name:"MFT 레코드 구조 (파일 메타데이터)", threat:false,
+        desc:"파일 1개 = MFT 레코드 1개(1024B). 레코드 내 속성($STANDARD_INFORMATION, $FILE_NAME, $DATA 등)에 타임스탬프·크기·경로·내용이 저장된다.",
+        parse_output:`[MFTECmd CSV 출력 — 주요 컬럼]
+EntryNumber  FileName         InUse  ParentPath                    FileSize   Created($SI)          Modified($SI)         Changed($SI)          Accessed($SI)
+                                                                             Created($FN)          Modified($FN)         Changed($FN)          Accessed($FN)
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+847261       svcupd.exe       True   C:\\ProgramData\\MicrosoftUpdate  251904     2024-09-02 09:32:11   2024-09-02 09:32:11   2024-09-02 09:33:15   2024-09-02 09:32:00
+                                                                             2024-09-02 09:32:11   2024-09-02 09:32:11   2024-09-02 09:32:11   2024-09-02 09:32:11
+851334       lss.dmp          False  C:\\Windows\\Temp                 43237376   2024-09-02 10:44:17   2024-09-02 10:44:17   2024-09-02 10:44:17   2024-09-02 10:44:17
+                                                                             2024-09-02 10:44:17   2024-09-02 10:44:17   2024-09-02 10:44:17   2024-09-02 10:44:17
+847400       malware_fake.exe True   C:\\Windows\\System32             245760     2019-01-15 08:00:00   2019-01-15 08:00:00   2024-09-02 09:32:30   2024-09-02 09:32:00
+                                                                             2024-09-02 09:32:11   2024-09-02 09:32:11   2024-09-02 09:32:11   2024-09-02 09:32:11
+                                                                             ↑ $FN은 실제 드롭 시간  ↑$SI만 과거로 조작 → Timestomping!`,
+        interpretation:[
+          { field:"EntryNumber (MFT 레코드 번호)", meaning:"파일마다 고유 번호. $UsnJrnl의 EntryId와 매핑하면 동일 파일의 생성~삭제 전체 이력 추적 가능" },
+          { field:"InUse=True/False", meaning:"True=현재 존재 / False=삭제됨. False여도 레코드가 재사용 전이면 메타데이터 전체 확인 가능. 이것이 '삭제 파일 복구'의 원리" },
+          { field:"$SI_Created vs $FN_Created 비교", meaning:"$STANDARD_INFORMATION($SI)은 Windows API(SetFileTime)로 누구나 변경 가능. $FILE_NAME($FN)은 커널 내부에서만 변경 → 훨씬 신뢰. 두 값이 다르면 Timestomping 강력 의심" },
+          { field:"$SI_Changed (MFT Changed)", meaning:"MFT 레코드 자체가 마지막으로 변경된 시간. 파일 내용·속성·권한이 변경될 때 갱신. Timestomping 시 이 값도 변함 → $FN_Changed와 비교" },
+          { field:"ParentPath (부모 경로)", meaning:"파일이 속한 폴더 경로. 비정상 경로(C:\\Temp, C:\\ProgramData, C:\\Windows\\Temp) 파일 집중 분석" },
+          { field:"FileSize=0 + InUse=True", meaning:"파일은 존재하지만 크기가 0 → 내용이 삭제되거나 비워진 것. 공격자가 증거 인멸을 위해 내용만 삭제한 패턴" },
+        ],
+        forensic:"$SI와 $FN 타임스탬프 차이 = Timestomping 확정 증거. $FN 기준으로 실제 침해 시간 재구성. InUse=False 파일의 메타데이터로 삭제된 악성 파일 목록 복원.",
+        ioc:"$SI_Created 수년 전 + $FN_Created 침해 시점, C:\\Temp·AppData 경로 .exe InUse=False",
+      },
+      {
+        file:"$MFT",
+        name:"ADS (대체 데이터 스트림)", threat:true,
+        desc:"NTFS는 파일 하나에 여러 개의 데이터 스트림($DATA 속성)을 가질 수 있다. 기본 스트림 외 숨겨진 스트림에 악성 페이로드를 숨길 수 있다.",
+        parse_output:`[MFTECmd — ADS(대체 데이터 스트림) 포함 출력]
+EntryNumber  FileName              StreamName          StreamSize   InUse  경로
+-----------------------------------------------------------------------------------------------
+847500       readme.txt            (기본 스트림)        1024         True   C:\\Users\\victim\\Desktop\\
+847500       readme.txt            :hidden_payload      245760       True   ← ADS에 실행파일 숨김!
+847501       legitimate.jpg        (기본 스트림)        102400       True   C:\\Users\\victim\\Pictures\\
+847501       legitimate.jpg        :Zone.Identifier     196          True   ← 정상 (인터넷 다운로드 표시)
+847502       normal_doc.docx       (기본 스트림)        50000        True   C:\\Users\\victim\\Documents\\
+847502       normal_doc.docx       :shellcode.exe       102400       True   ← 악성 ADS!`,
+        interpretation:[
+          { field:"StreamName이 비어있음", meaning:"기본 데이터 스트림($DATA). 일반적으로 파일 내용이 저장되는 곳" },
+          { field:":Zone.Identifier", meaning:"인터넷에서 다운로드된 파일에 자동 생성되는 정상 ADS. ZoneId=3이면 인터넷 다운로드. 이 값이 없는 .exe는 직접 복사되거나 프로그래밍으로 생성된 것" },
+          { field:":hidden_payload, :shellcode.exe 등", meaning:"정상 파일에 숨겨진 악성 페이로드. dir 명령이나 탐색기에서 보이지 않음. type readme.txt:hidden_payload로 실행 가능" },
+          { field:"StreamSize vs 파일 크기", meaning:"기본 스트림 크기와 전체 파일 크기가 다르면 ADS 존재. 탐색기에서 표시되는 크기는 기본 스트림만 반영" },
+        ],
+        forensic:"MFTECmd의 --ads 옵션으로 대체 데이터 스트림 전체 열거. Zone.Identifier 없는 .exe = 인터넷 다운로드 흔적 없음 → 내부 전달 또는 메모리에서 드롭된 파일.",
+        ioc:"정상 파일(txt, jpg, docx 등)에 .exe .dll .bat 스트림 존재, StreamSize 비정상적으로 큰 경우",
+      },
+      {
+        file:"$MFT",
+        name:"삭제 파일 복구 분석", threat:false,
+        desc:"InUse=False 레코드 분석으로 삭제된 파일의 메타데이터를 복원. 파일 내용 복구는 클러스터 덮어쓰기 여부에 따라 다름.",
+        parse_output:`[삭제된 파일 목록 — InUse=False 필터링 결과]
+EntryNumber  FileName         FileSize    $FN_Created           $FN_Modified          ParentPath                  IsOrphan
+-------------------------------------------------------------------------------------------------------------------------------------------
+851334       lss.dmp          43237376    2024-09-02 10:44:17   2024-09-02 10:44:17   C:\\Windows\\Temp\\             False
+918822       svcupd.exe       251904      2024-09-02 09:32:11   2024-09-02 09:32:11   C:\\ProgramData\\MicrosoftUpdate  False
+918823       svcupd.cfg       8192        2024-09-02 09:32:11   2024-09-02 09:32:11   C:\\ProgramData\\MicrosoftUpdate  False
+918901       tmp_arch.7z      487221843   2024-09-10 22:28:00   2024-09-10 22:28:00   C:\\ProgramData\\               False
+             (이름 없음)       4096        2024-09-15 03:10:00   2024-09-15 03:10:00   (고아 레코드)                  True  ← IsOrphan`,
+        interpretation:[
+          { field:"InUse=False + FileSize > 0", meaning:"삭제됐지만 클러스터를 아직 덮어쓰지 않았을 가능성. 파일 내용 복구 시도 가치 있음. 단, SSD의 TRIM 기능이 활성화됐다면 복구 불가" },
+          { field:"IsOrphan=True", meaning:"부모 디렉토리 레코드도 삭제된 '고아' 파일. 폴더 구조 없이 파일만 남은 상태. 공격자가 폴더째로 삭제 시 발생" },
+          { field:"$FN 타임스탬프 (삭제 파일)", meaning:"삭제된 파일도 $FN 타임스탬프는 유지. 악성 파일의 원본 생성·수정 시간 확인 가능" },
+          { field:"tmp_arch.7z FileSize=487MB", meaning:"유출 압축 파일 크기와 SRUM 송신량(487MB)이 일치하면 유출 파일 확정 증거" },
+        ],
+        forensic:"삭제 파일의 $FN 타임스탬프 + $UsnJrnl FileDelete 이벤트 + 파일 크기 3종 교차로 '언제, 무엇을, 얼마나 컸는지' 모두 증명.",
+        ioc:"침해 종료 시점(03:00~04:00) 대용량 파일·악성파일 일괄 삭제 패턴",
+      },
+      // ── $LogFile 항목 ──
+      {
+        file:"$LogFile",
+        name:"$LogFile 트랜잭션 로그", threat:false,
+        desc:"NTFS가 파일시스템 일관성을 위해 모든 메타데이터 변경을 트랜잭션으로 기록하는 로그. 매우 빠르게 롤오버되므로 최근 수십 분~수 시간 이내의 이벤트만 확인 가능.",
+        parse_output:`[MFTECmd $LogFile 파싱 결과]
+ClientLsn    TransactionId  Redo               Undo              FileName         Timestamp
+-----------------------------------------------------------------------------------------------
+0x1A2B3C4D   0x00001234     CreateFile         DeleteFile        svcupd.exe       2024-09-15 03:12:40
+0x1A2B3C4E   0x00001234     DeleteFile         CreateFile        svcupd.exe       2024-09-15 03:12:44  ← 삭제 완료
+0x1A2B3C4F   0x00001235     SetFileInfo        SetFileInfo       lss.dmp          2024-09-15 03:12:45
+0x1A2B3C50   0x00001235     DeleteFile         CreateFile        lss.dmp          2024-09-15 03:12:46
+0x1A2B3C51   0x00001236     RenameFile         RenameFile        malware→svchost  2024-09-02 09:32:05  ← 이름 변경!
+
+[LSN 시퀀스 번호]
+현재 LSN:     0x1F3A8C00  (최신 로그 위치)
+첫 LSN:       0x1A2B0000  (이 이전은 롤오버로 손실)
+로그 크기:    65536 KB (64 MB)`,
+        interpretation:[
+          { field:"ClientLsn (로그 시퀀스 번호)", meaning:"단조 증가하는 고유 번호. 번호 순서로 파일시스템 작업의 정확한 순서 재구성 가능" },
+          { field:"Redo / Undo 작업", meaning:"Redo=작업 내용, Undo=롤백 내용. CreateFile-DeleteFile 쌍이면 파일이 생성됐다가 삭제된 것" },
+          { field:"TransactionId 동일 항목", meaning:"같은 트랜잭션 ID를 가진 항목들은 하나의 원자적 작업. 여러 파일이 동시에 생성·삭제된 배치 작업 탐지 가능" },
+          { field:"RenameFile 이벤트", meaning:"파일 이름 변경 기록. 악성 파일이 정상 파일명으로 위장하거나, 파일 이름을 바꾸어 탐지 우회하는 패턴 탐지" },
+          { field:"로그 롤오버 (손실 구간)", meaning:"$LogFile 크기(기본 64MB) 초과 시 오래된 레코드 덮어씀. 롤오버 발생 시 롤오버 이전 이벤트 손실. $UsnJrnl이 더 오래 유지됨" },
+        ],
+        forensic:"$LogFile은 롤오버가 빠르므로 수집 우선순위는 낮음. 그러나 최근 수십 분 이내 파일명 변경·삭제 순서 재구성에는 $UsnJrnl보다 세밀한 정보 제공.",
+        ioc:"Redo=DeleteFile 대량 발생, RenameFile로 악성→정상 이름 변경, 트랜잭션 ID 단위 일괄 삭제",
+      },
+      // ── $UsnJrnl 항목 ──
+      {
+        file:"$UsnJrnl",
+        name:"$UsnJrnl:$J 변경 저널 — 파일 변경 이벤트", threat:true,
+        desc:"파일 생성·수정·삭제·이름변경 등 모든 파일시스템 이벤트를 USN(Update Sequence Number) 순서로 기록. $LogFile보다 훨씬 오래 유지(수십~수백 MB). 삭제 증거 복원의 핵심.",
+        parse_output:`[MFTECmd $J 파싱 결과 — 주요 컬럼]
+TimeStamp(UTC)          EntryId    ParentEntryId  EntryName             Reason                                          Extension  IsDirectory
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2024-09-02 09:32:11     847261     847200         svcupd.exe            FileCreate                                      .exe       False
+2024-09-02 09:32:11     847262     847200         svcupd.cfg            FileCreate                                      .cfg       False
+2024-09-02 09:33:15     847261     847200         svcupd.exe            BasicInfoChange                                 .exe       False  ← 타임스탬프 변경!
+2024-09-02 09:35:01     847263     847200         config.dat            FileCreate|StreamChange                         .dat       False
+2024-09-02 10:44:17     851334     40961          lss.dmp               FileCreate|DataExtend|Close                     .dmp       False
+2024-09-02 11:15:00     852100     40000          RD-SRV-002            RenameOldName                                   (없음)     False
+2024-09-02 11:15:00     852101     40000          RD-SRV-002.rdp        RenameNewName                                   .rdp       False  ← 이름 변경!
+2024-09-03 14:22:01     854200     40961          Staging               DirectoryCreate                                 (없음)     True   ← 폴더 생성!
+2024-09-10 22:28:00     891200     40961          7z.exe                FileCreate                                      .exe       False  ← 압축 도구 드롭
+2024-09-10 22:28:30     891201     40961          tmp_arch.7z           FileCreate|DataExtend|Close                     .7z        False
+2024-09-15 03:12:40     918820     847200         MicrosoftUpdate       DirectoryDelete|Close                           (없음)     True   ← 폴더 삭제!
+2024-09-15 03:12:44     918822     847200         svcupd.exe            FileDelete|Close                                .exe       False  ← 파일 삭제!
+2024-09-15 03:12:45     918823     40961          lss.dmp               FileDelete|Close                                .dmp       False
+2024-09-15 03:12:46     918901     40961          tmp_arch.7z           FileDelete|Close                                .7z        False`,
+        interpretation:[
+          { field:"Reason: FileCreate", meaning:"새 파일 생성. 악성 파일 드롭 정확한 시점 특정. EntryId로 MFT 레코드와 연결하면 파일 크기·속성도 확인" },
+          { field:"Reason: FileDelete | Close", meaning:"파일 삭제 완료. 공격자 철수 시 증거 삭제 목록 완전 복원 가능. MFT InUse=False 레코드와 교차 확인" },
+          { field:"Reason: BasicInfoChange", meaning:"$STANDARD_INFORMATION 속성 변경. 타임스탬프 변조(Timestomping) 시 반드시 이 이벤트 발생. FileCreate 직후 BasicInfoChange = Timestomping 강력 의심" },
+          { field:"Reason: DataExtend | DataTruncation", meaning:"파일 크기 증가/감소. 파일에 데이터가 추가되거나 잘린 것. 단계적 DataExtend = 파일 점진적 작성 (압축 파일 생성 패턴)" },
+          { field:"Reason: RenameOldName + RenameNewName", meaning:"파일 이름 변경의 이전 이름과 새 이름. 두 이벤트가 쌍으로 발생. 악성 파일이 정상 파일명으로 위장하는 순간 포착" },
+          { field:"Reason: StreamChange", meaning:"대체 데이터 스트림(ADS) 변경. ADS에 페이로드를 숨기는 공격 탐지" },
+          { field:"IsDirectory=True", meaning:"폴더에 대한 이벤트. 스테이징 폴더 생성(DirectoryCreate)·삭제(DirectoryDelete) 추적 가능" },
+          { field:"EntryId + ParentEntryId", meaning:"MFT 레코드 번호와 부모 폴더 번호. MFT와 조합하면 삭제된 파일의 전체 경로 재구성 가능" },
+        ],
+        forensic:"FileCreate→BasicInfoChange 패턴 = Timestomping. FileCreate→FileDelete 쌍 = 존재했다가 삭제된 파일. DirectoryCreate(Staging) = 데이터 수집 스테이징 폴더.",
+        ioc:"BasicInfoChange immediately after FileCreate, FileDelete 대량 발생 (침해 종료 시간대), DirectoryCreate Staging",
+      },
+      {
+        file:"$UsnJrnl",
+        name:"$UsnJrnl Reason 코드 전체 가이드", threat:false,
+        desc:"$UsnJrnl의 Reason 필드에 기록되는 코드 전체 목록과 의미. 여러 코드가 OR 결합되어 하나의 이벤트에 복수 코드가 나타날 수 있다.",
+        parse_output:`Reason 코드              16진수값   의미
+------------------------------------------------------------------
+FileCreate               0x00000100  파일 새로 생성됨
+FileDelete               0x00000200  파일 삭제됨
+DataOverwrite            0x00000001  파일 내용 덮어쓰기
+DataExtend               0x00000002  파일 크기 증가 (데이터 추가)
+DataTruncation           0x00000004  파일 크기 감소 (데이터 잘림)
+BasicInfoChange          0x00008000  타임스탬프·속성 변경 (Timestomping!)
+RenameOldName            0x00001000  이름 변경 — 이전 이름
+RenameNewName            0x00002000  이름 변경 — 새 이름
+SecurityChange           0x00000800  파일 권한(ACL) 변경
+StreamChange             0x00200000  대체 데이터 스트림(ADS) 변경
+ObjectIdChange           0x00080000  객체 ID 변경
+CompressionChange        0x00020000  압축 속성 변경
+EncryptionChange         0x00040000  암호화 속성 변경
+DirectoryCreate          0x00000100  폴더 생성 (IsDirectory=True)
+DirectoryDelete          0x00000200  폴더 삭제 (IsDirectory=True)
+Close                    0x80000000  파일 핸들 닫힘 (이벤트 완료)
+Indexable                0x00004000  인덱싱 속성 변경
+
+[복합 이벤트 예시]
+FileCreate | DataExtend | Close  = 새 파일 생성 후 데이터 쓰고 핸들 닫음 (일반적 파일 생성)
+FileDelete | Close               = 파일 삭제 후 핸들 닫음 (완전 삭제)
+DataOverwrite | DataExtend       = 기존 파일 내용 변경 (수정)`,
+        interpretation:[
+          { field:"Close 코드 포함", meaning:"핸들이 닫힌 시점 = 작업 완료 시점. FileCreate|Close의 시간 = 파일 생성 완료 시간" },
+          { field:"FileCreate | DataExtend 연속", meaning:"파일 생성 후 데이터 추가. 단계적으로 파일이 쓰여지는 과정. 대용량 파일(압축본, 덤프)을 점진적으로 작성할 때 나타남" },
+          { field:"BasicInfoChange 단독", meaning:"파일 내용 변경 없이 타임스탬프·속성만 변경. 전형적인 Timestomping 이벤트" },
+          { field:"SecurityChange", meaning:"파일 권한 변경. 악성 파일을 Everyone 읽기·실행 가능으로 변경하는 준비 단계" },
+        ],
+        forensic:"Reason 코드 조합 패턴으로 공격 행위를 정확히 식별. FileCreate+BasicInfoChange=Timestomping, DataExtend 반복=단계적 파일 작성.",
+        ioc:"BasicInfoChange 단독, FileCreate 직후 BasicInfoChange, SecurityChange on 악성 파일",
+      },
+      {
+        file:"$UsnJrnl",
+        name:"$UsnJrnl 롤오버 & 수집 전략", threat:false,
+        desc:"$UsnJrnl은 크기 제한이 있어 오래된 데이터부터 덮어씀. 수집 전략과 유실 여부 확인 방법.",
+        parse_output:`[$Max 스트림 정보 — 저널 크기 설정]
+MaximumSize:   0x0000000004000000  (64 MB — 기본값)
+AllocationDelta: 0x0000000000800000 (8 MB 단위 할당)
+
+[수집 가능한 USN 범위 확인]
+첫 번째 USN:   0x00000000 1A2B0000  (이전 데이터는 손실)
+현재 USN:      0x00000000 1F3A8C00
+손실 예상 기간: 약 7일치 이벤트 (시스템 활동량에 따라 다름)
+
+[롤오버 감지]
+MFT EntryId 847261 파일의 $UsnJrnl 첫 이벤트가
+FileCreate가 아닌 DataExtend로 시작 → 생성 이벤트가 롤오버로 손실됨
+
+[ExtractUsnJrnl 수집 명령]
+fsutil usn readjournal C: csv > usnjrnl_live.csv   (라이브 시스템)
+MFTECmd.exe -f $J --csv output\\                   (오프라인 이미지)`,
+        interpretation:[
+          { field:"MaximumSize=64MB", meaning:"기본값. 시스템 활동이 활발하면 수일 분량만 유지. 보안 강화 환경에서는 512MB~1GB로 늘리기도 함" },
+          { field:"첫 번째 USN vs 현재 USN 간격", meaning:"간격이 클수록 많은 이벤트 기록됨. 간격이 작으면 최근 롤오버 발생. 손실 없이 얼마나 거슬러 올라갈 수 있는지 파악 필수" },
+          { field:"FileCreate 없이 DataExtend로 시작", meaning:"해당 파일의 생성 이벤트가 롤오버로 손실됨. MFT의 $FN 타임스탬프로 생성 시간을 대신 확인" },
+          { field:"라이브 수집 vs 오프라인 분석", meaning:"라이브: fsutil usn readjournal (현재 활성 저널만). 오프라인: MFTECmd -f $J (이미지에서 추출, 전체 $J 스트림 분석 가능)" },
+        ],
+        forensic:"사고 접수 즉시 $J 스트림 수집이 최우선. 시간이 지날수록 롤오버로 이벤트 손실. 수집 시 $J의 전체 크기를 메모할 것.",
+        ioc:"수집 지연으로 인한 롤오버 → FileCreate 이벤트 손실 → MFT $FN 타임스탬프로 보완",
+      },
+    ],
+    tips:[
+      "수집 최우선순위: $J($UsnJrnl) > $MFT > $LogFile. $J는 롤오버로 가장 빨리 소실",
+      "$SI_Created < $FN_Created이면 Timestomping 확정. $FN을 실제 생성 시간으로 사용",
+      "MFTECmd --body 옵션 → log2timeline 형식 → plaso/timesketch로 전체 타임라인 통합",
+      "InUse=False + FileSize > 0 → 카빙 시도. SSD TRIM 활성화 시 복구 어려움",
+      "ADS 탐지: MFTECmd --ads 옵션 또는 dir /r 명령으로 열거",
+      "$LogFile은 64MB 초과 시 빠르게 롤오버 → 최근 수십 분만 유효. 빠른 수집 필요",
+      "Zone.Identifier ADS 없는 .exe는 브라우저 다운로드가 아님 → 내부 드롭 또는 메모리 실행",
+      "Velociraptor로 라이브 시스템 $MFT + $J 원격 수집 가능 — 이미지 불필요",
     ],
   },
   {
-    id: "mft", icon: "📁", name: "MFT", subtitle: "Master File Table",
-    color: "#06d6a0", category: "파일시스템",
-    location: "C:\\$MFT  (숨김 시스템 파일)",
-    files: ["$MFT", "$LogFile", "$UsnJrnl"],
-    tools: ["MFTECmd", "Autopsy", "Velociraptor"],
-    summary: "NTFS의 핵심. 모든 파일의 MACE 시간 기록. 삭제된 파일도 복구 가능.",
-    whatYouCanFind: "파일 생성/수정/접근/MFT변경 시간(MACE), 삭제된 파일 흔적, 이름·크기·경로 이력",
-    keyEvents: [
-      { id: "Created", desc: "파일이 처음 만들어진 시간", threat: false },
-      { id: "Modified", desc: "파일 내용이 마지막으로 바뀐 시간", threat: false },
-      { id: "Accessed", desc: "파일을 마지막으로 열어본 시간", threat: false },
-      { id: "MFT Changed", desc: "MFT 레코드 자체가 변경된 시간", threat: false },
-      { id: "Timestomping", desc: "Created > Modified → 시간 조작 의심", threat: true },
-      { id: "$UsnJrnl", desc: "파일 변경 저널 → 삭제 파일도 기록", threat: false },
+    id:"lnk", icon:"🔗", name:"LNK / 점프리스트", subtitle:"Shortcut & JumpList",
+    color:"#ffa657", category:"사용자행위",
+    summary:"사용자가 파일을 열 때 Windows가 자동 생성하는 바로가기 파일. 원본 파일이 삭제되어도 경로·접근 시간·MAC 주소·볼륨 시리얼이 LNK에 남아 파일 접근 사실을 증명한다.",
+    locations:[
+      { path:"C:\\Users\\<user>\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\*.lnk", desc:"최근 파일 LNK 모음" },
+      { path:"C:\\Users\\<user>\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\AutomaticDestinations\\*.automaticDestinations-ms", desc:"자동 점프리스트 (앱별 최근 파일)" },
+      { path:"C:\\Users\\<user>\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\CustomDestinations\\*.customDestinations-ms", desc:"사용자 고정 점프리스트" },
+      { path:"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\ (공용 바로가기)", desc:"시스템 전체 바로가기" },
     ],
-    tips: [
-      "MACE 4개 시간 비교 → 이상하면 Timestomping 의심",
-      "$UsnJrnl에서 삭제 파일 생성·삭제 이벤트 확인",
-      "공격 시간대 C:\\Temp 생성 파일 집중 확인",
-      "파일 크기 0이지만 MFT 존재 → 내용 삭제 후 껍데기",
+    tools:[
+      { name:"LECmd", desc:"Eric Zimmerman LNK 파서", cmd:"LECmd.exe -d \"C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Recent\" --csv output\\ --csvf lnk.csv" },
+      { name:"JLECmd", desc:"Eric Zimmerman 점프리스트 파서", cmd:"JLECmd.exe -d \"C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Recent\" --csv output\\ --csvf jumplist.csv" },
+    ],
+    keyItems:[
+      {
+        name:"LNK 핵심 메타데이터", threat:false,
+        desc:"LNK 파일 하나에 원본 파일에 대한 방대한 정보가 저장된다.",
+        parse_output:`Source Name: 방산청_협력사_공문_2024.docx.lnk
+Source Created:    2024-09-02 09:14:33   ← LNK 생성 = 파일 최초 접근 시간
+Source Modified:   2024-09-02 09:14:33
+Source Accessed:   2024-09-02 09:31:20
+
+[링크 대상 정보]
+Target Full Path:  C:\\Users\\victim\\Downloads\\방산청_협력사_공문_2024.docx
+Target Created:    2024-09-02 09:13:45
+Target Modified:   2024-09-02 09:13:45
+Target File Size:  245760 bytes (240 KB)
+
+[볼륨 정보]
+Drive Type:        Fixed (내장 드라이브)
+Volume Serial:     0xA1B2C3D4
+Volume Label:      Windows
+
+[네트워크 공유 정보 — USB/네트워크인 경우]
+Network Share Path: \\\\192.168.10.20\\C$\\Tools\\malware.exe  ← 네트워크 접근 경로!
+Network Share Name: C$
+
+[호스트 정보]
+Machine ID (MAC):  00-1A-2B-3C-4D-5E   ← 생성 당시 네트워크 어댑터 MAC
+NetBIOS Name:      ATTACKER-PC          ← 원본 컴퓨터명`,
+        interpretation:[
+          { field:"Source Created = LNK 생성 시간", meaning:"원본 파일을 처음 연 시간. 파일 탐색기, Office 등으로 파일을 열면 LNK 자동 생성. 정확한 최초 접근 시점" },
+          { field:"Target Full Path", meaning:"원본 파일의 전체 경로. 파일이 삭제되어도 경로 정보가 여기에 남음. 악성 파일의 위치 특정 가능" },
+          { field:"Network Share Path", meaning:"네트워크 공유로 파일 접근 시 \\\\서버IP\\공유명\\파일명 형태로 기록. 측면 이동 경로 직접 증명" },
+          { field:"Machine ID (MAC 주소)", meaning:"LNK 파일 생성 당시 PC의 네트워크 어댑터 MAC. 다른 PC에서 만들어진 LNK라면 원본 PC 식별 가능" },
+          { field:"NetBIOS Name", meaning:"LNK를 생성한 컴퓨터 이름. 내부 이동 경로 추적, 원본 PC 특정에 활용" },
+          { field:"Volume Serial", meaning:"드라이브 고유 식별자. MountedDevices, USBSTOR 레지스트리와 교차하면 드라이브 특정 가능" },
+        ],
+        forensic:"LNK의 Network Share Path에 내부 서버 IP가 있으면 측면 이동의 직접 증거. MAC 주소로 원본 PC 특정.",
+        ioc:"Network Share Path에 \\\\내부IP\\ADMIN$ 또는 \\\\내부IP\\C$ 포함, 다른 PC의 MAC 주소",
+      },
+      {
+        name:"점프리스트 (JumpList)", threat:false,
+        desc:"앱별로 최근 사용한 파일 목록을 저장. LNK보다 더 많은 파일 접근 이력을 보관.",
+        parse_output:`[자동 점프리스트: Microsoft Word]
+AppId: d3b233c31b22c7ac
+Entry Count: 18
+
+순서  파일명                                    접근시간              크기
+-------------------------------------------------------------------------------------
+0     방산청_협력사_공문_2024.docx               2024-09-02 09:14      245760
+1     기술연구_기밀_Rev3.docx                    2024-09-03 14:30      1052160   ← 기밀 문서!
+2     직원_급여_명세.xlsx                        2024-09-04 11:20      87040
+3     system_admin_credentials.txt              2024-09-04 16:45      1024      ← 자격증명 파일!
+4     VPN_config_backup.conf                    2024-09-05 09:00      4096      ← VPN 설정!`,
+        interpretation:[
+          { field:"AppId", meaning:"앱별 고유 ID. Word, Excel, Explorer, Chrome 등 앱이 특정됨. 어떤 앱으로 파일을 열었는지 파악" },
+          { field:"Entry Count", meaning:"저장된 파일 접근 이력 개수. LNK보다 더 많은 이력을 보관하는 경우가 많음" },
+          { field:"파일명 목록", meaning:"공격자가 열람한 파일 목록. 기밀 문서, 자격증명 파일, 설정 파일에 대한 접근 직접 증명" },
+          { field:"접근 시간 순서", meaning:"파일 열람 순서와 시간으로 공격자의 행동 흐름 재구성 가능" },
+        ],
+        forensic:"credentials, password, vpn, config, backup 등 키워드가 포함된 파일명이 있으면 내부 정찰 직접 증거.",
+        ioc:"자격증명 파일(.txt, .xlsx), VPN 설정 파일, 기밀 문서에 대한 접근 이력",
+      },
+    ],
+    tips:[
+      "LNK 파일은 원본 삭제 후에도 30일간 유지 (Windows 기본 정책)",
+      "공격자가 Recent 폴더를 삭제해도 $UsnJrnl에 LNK 생성·삭제 이벤트 남음",
+      "LECmd --all 옵션으로 숨겨진 LNK 속성까지 모두 추출",
+      "JumpList의 AppId 목록: WORD=d3b233c31b22c7ac, EXCEL=5d696d521de238c3, EXPLORER=b8ab77100df80ab3",
+      "점프리스트는 LNK보다 더 오래된 파일 접근 이력을 보관하는 경우가 많음",
     ],
   },
   {
-    id: "lnk", icon: "🔗", name: "LNK / 점프리스트", subtitle: "Shortcut & JumpList",
-    color: "#ffa657", category: "사용자행위",
-    location: "C:\\Users\\<user>\\AppData\\Roaming\\\nMicrosoft\\Windows\\Recent\\",
-    files: ["*.lnk", "*.automaticDestinations-ms"],
-    tools: ["LECmd", "JLECmd", "Autopsy"],
-    summary: "원본 파일이 삭제되어도 경로·시간·MAC주소·볼륨 정보가 LNK에 남는다.",
-    whatYouCanFind: "원본 파일 경로, 접근 시간, 파일 크기, 호스트명, MAC 주소, 볼륨 시리얼 번호",
-    keyEvents: [
-      { id: "원본 경로", desc: "USB·네트워크 드라이브 파일 접근 흔적", threat: false },
-      { id: "호스트 정보", desc: "다른 PC의 LNK → 원본 컴퓨터명 노출", threat: false },
-      { id: "MAC 주소", desc: "LNK 생성 당시 네트워크 어댑터 MAC", threat: false },
-      { id: "볼륨 시리얼", desc: "USB 기기 특정에 활용 가능", threat: false },
+    id:"shellbag", icon:"🗂", name:"쉘백", subtitle:"Shellbag",
+    color:"#ff9f43", category:"사용자행위",
+    summary:"파일 탐색기로 폴더를 열 때 Windows가 창 크기·위치·정렬 방식을 저장하는 레지스트리 키. 사용자가 방문한 모든 폴더 경로와 접근 시간이 기록되며, 폴더가 삭제된 후에도 흔적이 남는다.",
+    locations:[
+      { path:"NTUSER.DAT: Software\\Microsoft\\Windows\\Shell\\BagMRU", desc:"탐색기 폴더 탐색 이력 (기본 폴더)" },
+      { path:"NTUSER.DAT: Software\\Microsoft\\Windows\\Shell\\Bags", desc:"각 폴더의 창 설정 저장" },
+      { path:"UsrClass.dat: Local Settings\\Software\\Microsoft\\Windows\\Shell\\BagMRU", desc:"더 상세한 탐색 이력. ZIP·폴더 내부 포함 (핵심!)" },
+      { path:"UsrClass.dat: Local Settings\\Software\\Microsoft\\Windows\\Shell\\Bags", desc:"창 설정 (UsrClass)" },
     ],
-    tips: [
-      "네트워크 공유 파일 열면 LNK에 서버 경로가 남음",
-      "USB 악성 파일 실행 시 LNK에 USB 경로 포함",
-      "원본 파일 삭제해도 LNK로 접근 사실 증명",
-      "JumpList는 앱별 최근 파일 → 더 세밀한 행동 추적",
+    tools:[
+      { name:"ShellBagsExplorer", desc:"Eric Zimmerman GUI 도구. 폴더 트리 시각화", cmd:"ShellBagsExplorer.exe (GUI)" },
+      { name:"SBECmd", desc:"명령줄 쉘백 파서. CSV 출력", cmd:"SBECmd.exe -d \"C:\\Users\" --csv output\\ --csvf shellbag.csv" },
     ],
-  },
-  {
-    id: "shellbag", icon: "🗂", name: "쉘백", subtitle: "Shellbag",
-    color: "#ff9f43", category: "사용자행위",
-    location: "NTUSER.DAT / USRCLASS.DAT\n(레지스트리 내부)",
-    files: ["NTUSER.DAT", "USRCLASS.DAT"],
-    tools: ["ShellBagsExplorer", "RegRipper"],
-    summary: "탐색기에서 열어본 폴더 이력. 삭제된 폴더, 외부 드라이브 탐색 흔적까지 남는다.",
-    whatYouCanFind: "열어본 폴더 경로, 접근 시간, USB·네트워크 드라이브 탐색 이력, 삭제된 폴더 접근 흔적",
-    keyEvents: [
-      { id: "폴더 접근 이력", desc: "탐색기로 연 모든 폴더 (삭제된 것도)", threat: false },
-      { id: "외부 저장소", desc: "USB, 네트워크 드라이브 탐색 이력", threat: false },
-      { id: "숨김 폴더", desc: "숨김 처리된 악성 폴더 접근 흔적", threat: true },
+    keyItems:[
+      {
+        name:"폴더 탐색 이력", threat:false,
+        desc:"탐색기로 열어본 모든 폴더의 경로와 접근 시간. 삭제된 폴더, 외부 드라이브, 네트워크 공유 경로까지 기록.",
+        parse_output:`AbsolutePath                                          FirstInteracted          LastInteracted           MRUOrder
+------------------------------------------------------------------------------------------------------------------------------
+C:\\                                                    2023-01-15 09:00         2024-09-15 03:10         0
+C:\\Staging                                             2024-09-03 14:22         2024-09-10 22:28         1  ← 스테이징 폴더!
+C:\\Staging\\Research                                   2024-09-03 14:25         2024-09-10 22:25         2
+C:\\Windows\\Temp                                       2024-09-02 09:35         2024-09-15 03:12         3  ← 악성 파일 확인
+C:\\ProgramData\\MicrosoftUpdate                        2024-09-02 09:33         2024-09-02 09:33         4  ← 악성 폴더
+E:\\SecretDocs (이동식 드라이브)                          2024-09-05 22:10         2024-09-05 22:30         5  ← USB!
+\\\\192.168.10.20\\C$\\Tools                             2024-09-02 11:15         2024-09-07 03:00         6  ← 측면이동!`,
+        interpretation:[
+          { field:"AbsolutePath (절대 경로)", meaning:"탐색기로 접근한 폴더의 전체 경로. 폴더가 삭제되어도 경로가 여기에 남아 존재했음을 증명" },
+          { field:"FirstInteracted", meaning:"해당 폴더를 처음 열어본 시간. 스테이징 폴더 최초 생성 시점과 연계 분석 가능" },
+          { field:"LastInteracted", meaning:"마지막으로 접근한 시간. 공격 종료 시점 추정에 활용" },
+          { field:"이동식 드라이브 경로 (E:\\...)", meaning:"USB 또는 외장 하드에서 탐색한 폴더. LNK·USBSTOR 레지스트리와 교차하면 USB 접근 확정" },
+          { field:"네트워크 경로 (\\\\IP\\...)", meaning:"내부 서버 공유 폴더 접근. 측면 이동 경로와 정찰 범위 직접 파악 가능" },
+          { field:"비정상 폴더 (C:\\Staging, ProgramData\\...)", meaning:"정상 사용에서 나타나지 않는 경로. 공격자가 생성한 수집·스테이징 폴더 접근 증거" },
+        ],
+        forensic:"\\\\내부IP\\공유 경로 존재 시 측면 이동 확정. C:\\Staging 같은 비정상 폴더는 데이터 수집 증거.",
+        ioc:"C:\\Staging\\ 또는 유사 수집 폴더, \\\\내부IP\\ADMIN$, 이동식 드라이브 경로",
+      },
     ],
-    tips: [
-      "공격자 내부 정찰 경로를 역추적 가능",
-      "삭제된 폴더도 쉘백에 기록 남아 존재 증명",
-      "USB 연결 + 쉘백 = 'USB로 어느 폴더 봤는가' 증명",
-    ],
-  },
-  {
-    id: "browser", icon: "🌐", name: "브라우저 히스토리", subtitle: "Browser Artifacts",
-    color: "#4ecdc4", category: "네트워크",
-    location: "C:\\Users\\<user>\\AppData\\Local\\\nGoogle\\Chrome\\User Data\\Default\\",
-    files: ["History (SQLite)", "Downloads", "Cookies", "Login Data"],
-    tools: ["DB Browser for SQLite", "Hindsight", "BrowsingHistoryView"],
-    summary: "C2 통신·악성 파일 다운로드 경로 추적의 핵심.",
-    whatYouCanFind: "방문 URL·시간, 다운로드 파일·출처 URL, 검색어, 로그인 정보(암호화), 캐시 데이터",
-    keyEvents: [
-      { id: "다운로드 기록", desc: "악성 파일 다운로드 출처 URL 확인 가능", threat: true },
-      { id: "방문 기록", desc: "C2 서버·피싱 사이트 접속 이력", threat: true },
-      { id: "검색어", desc: "공격자가 시스템 내부에서 검색한 내용", threat: false },
-    ],
-    tips: [
-      "Downloads 테이블 referrer 컬럼 → 악성 파일 출처",
-      "히스토리는 SQLite DB → DB Browser로 바로 열기",
-      "시크릿 모드 사용 시 기록 없음 → SRUM으로 보완",
+    tips:[
+      "UsrClass.dat의 쉘백이 NTUSER.DAT보다 훨씬 상세함 — 반드시 둘 다 분석",
+      "ZIP 파일 내부 폴더도 쉘백에 기록됨 → 압축 파일 탐색 이력 파악 가능",
+      "네트워크 경로(UNC)가 있으면 해당 IP의 이벤트 로그와 교차 분석",
+      "삭제된 폴더는 경로가 남지만 FirstInteracted 시간이 부정확할 수 있음",
+      "SBECmd --dt 옵션으로 로컬 시간 기준 출력 (타임존 자동 적용)",
     ],
   },
   {
-    id: "srum", icon: "📊", name: "SRUM", subtitle: "System Resource Usage Monitor",
-    color: "#a29bfe", category: "네트워크",
-    location: "C:\\Windows\\System32\\sru\\SRUDB.dat",
-    files: ["SRUDB.dat (ESE Database)"],
-    tools: ["SrumECmd", "srum-dump"],
-    summary: "프로세스별 네트워크 사용량을 30일간 기록. 삭제된 악성코드 통신도 추적 가능.",
-    whatYouCanFind: "프로세스별 송수신 바이트, 실행 시간, 에너지 사용량, 앱별 네트워크 연결 이력",
-    keyEvents: [
-      { id: "네트워크 사용량", desc: "데이터 유출 규모 추정 가능", threat: true },
-      { id: "프로세스 이름", desc: "삭제된 악성 파일도 30일간 기록 유지", threat: true },
-      { id: "실행 시간대", desc: "프로세스가 언제 얼마나 실행됐는지", threat: false },
+    id:"browser", icon:"🌐", name:"브라우저 히스토리", subtitle:"Browser Artifacts",
+    color:"#4ecdc4", category:"네트워크",
+    summary:"Chrome·Edge·Firefox 등의 방문 기록, 다운로드 이력, 검색어, 쿠키, 저장된 비밀번호가 SQLite DB로 저장된다. C2 서버 접속·피싱 사이트 방문·악성 파일 다운로드 경로 추적의 핵심.",
+    locations:[
+      { path:"C:\\Users\\<user>\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\History", desc:"Chrome 방문·다운로드 기록 (SQLite)" },
+      { path:"C:\\Users\\<user>\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", desc:"Edge 방문·다운로드 기록 (동일 구조)" },
+      { path:"C:\\Users\\<user>\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\<profile>\\places.sqlite", desc:"Firefox 방문 기록" },
+      { path:"C:\\Users\\<user>\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Login Data", desc:"저장된 자격증명 (암호화)" },
+      { path:"C:\\Users\\<user>\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies", desc:"쿠키 데이터" },
+      { path:"C:\\Users\\<user>\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cache\\", desc:"캐시 파일 (일부 복원 가능)" },
     ],
-    tips: [
-      "대용량 유출 의심 시 SRUM에서 프로세스 송신량 확인",
-      "악성 파일 삭제 후에도 30일치 실행 기록 남음",
-      "SrumECmd로 CSV 추출 → Excel 분석 편리",
+    tools:[
+      { name:"Hindsight", desc:"Chrome·Chromium 전용 포렌식 도구. 방문 기록·다운로드·쿠키·캐시 통합 분석", cmd:"hindsight.py -i \"Chrome\\User Data\\Default\" -o output\\" },
+      { name:"DB Browser for SQLite", desc:"SQLite DB 직접 열람. 테이블 구조 확인에 유용", cmd:"(GUI 도구)" },
+      { name:"BrowsingHistoryView", desc:"여러 브라우저 통합 히스토리 뷰어", cmd:"(GUI 도구)" },
+    ],
+    keyItems:[
+      {
+        name:"방문 기록 (urls·visits 테이블)", threat:true,
+        desc:"방문한 모든 URL과 방문 시간. C2 서버 도메인, 피싱 사이트, 악성 파일 호스팅 사이트 탐지.",
+        parse_output:`[urls 테이블 + visits 테이블 조인 결과]
+visit_time(UTC)       url                                                   title                    visit_count
+--------------------------------------------------------------------------------------------------------------------
+2024-09-02 09:13:20   http://attacker-cdn[.]com/docs/공문.docx               문서 다운로드               1
+2024-09-02 09:13:22   http://attacker-cdn[.]com/docs/공문.docx               문서 다운로드               2  (리다이렉트)
+2024-09-02 09:35:01   https://update-ms-cdn[.]com/beacon                    (빈 페이지)                1  ← C2 비콘!
+2024-09-02 09:35:02   https://update-ms-cdn[.]com/beacon                    (빈 페이지)                2
+2024-09-10 22:00:00   https://wetransfer.com/uploads                        WeTransfer               1  ← 파일 업로드!
+2024-09-10 22:05:44   https://wetransfer.com/downloads/...                  다운로드 링크              1`,
+        interpretation:[
+          { field:"visit_time (WebKit 타임스탬프)", meaning:"1601-01-01 기준 마이크로초 단위. DB Browser나 Hindsight가 자동 변환. 수동 변환: (값 - 11644473600000000) / 1000000 → Unix timestamp" },
+          { field:"visit_count > 1", meaning:"같은 URL 여러 번 방문 또는 리다이렉트 체인. C2 비콘이 반복 전송될 때 나타남" },
+          { field:"C2 도메인 패턴", meaning:"update-, cdn-, cdn-delivery-, ms-update- 등 Microsoft 위장 도메인. IP 직접 접속(http://123.456.x.x) 패턴도 주목" },
+          { field:"파일 업로드 서비스 접속", meaning:"WeTransfer, Google Drive, Dropbox, Mega 등 클라우드 스토리지 → 데이터 유출 경로 의심" },
+        ],
+        forensic:"C2 도메인 방문 이력 + SRUM 네트워크 사용량 조합으로 통신 시간과 용량 모두 증명 가능.",
+        ioc:"Microsoft 위장 도메인, IP 직접 접속 URL, 파일 업로드 서비스 접속",
+      },
+      {
+        name:"다운로드 기록 (downloads 테이블)", threat:true,
+        desc:"다운로드한 파일의 URL, 저장 경로, 크기, 시작·완료 시간이 기록된다. referrer로 파일의 출처 사이트도 파악.",
+        parse_output:`[downloads 테이블]
+start_time            end_time              target_path                                          total_bytes  referrer                              state
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2024-09-02 09:13:45   2024-09-02 09:13:46   C:\\Users\\victim\\Downloads\\방산청_협력사_공문_2024.docx  245760       http://attacker-cdn[.]com/phishing/    COMPLETE
+2024-09-02 09:31:50   2024-09-02 09:32:05   C:\\Users\\victim\\Downloads\\update_tool.exe              2457600      http://attacker-cdn[.]com/tools/       COMPLETE
+2024-09-10 21:58:00   (null)                C:\\Staging\\archive.7z                                  (partial)    (없음)                                INTERRUPTED`,
+        interpretation:[
+          { field:"target_path (저장 경로)", meaning:"파일이 저장된 경로. Downloads 폴더가 아닌 비정상 경로(Staging, Temp 등)는 공격자가 직접 지정한 것" },
+          { field:"referrer (출처 URL)", meaning:"파일을 다운로드한 페이지의 URL. 피싱 사이트, C2 서버, 악성 다운로드 페이지 특정 가능" },
+          { field:"total_bytes vs 실제 파일 크기", meaning:"다운로드 완료 크기와 MFT 파일 크기가 일치하면 동일 파일 확인. 불일치 시 중간 처리 의심" },
+          { field:"state=INTERRUPTED", meaning:"다운로드 중단. 큰 파일 업로드/다운로드 시도 흔적. partial 파일이 남아있을 수 있음" },
+        ],
+        forensic:"referrer URL이 공격자 인프라와 일치하면 최초 침투 경로 직접 증명. 저장 경로의 MFT 타임스탬프와 교차 확인.",
+        ioc:"Downloads 외 비정상 경로 저장, .exe .bat .ps1 파일 다운로드, 공격자 도메인 referrer",
+      },
+    ],
+    tips:[
+      "시크릿/InPrivate 모드 사용 시 History DB에 기록 없음 → SRUM·DNS 캐시·방화벽 로그로 보완",
+      "Chrome은 WAL(Write-Ahead Log) 사용 — History-wal 파일도 함께 가져와야 최신 데이터 확인",
+      "Hindsight로 캐시 분석 시 공격자가 방문한 페이지 일부 복원 가능",
+      "Login Data 파일: 저장된 자격증명(암호화). DPAPI 키로 복호화 가능",
+      "방문 기록 삭제해도 SQLite freelist 영역에 일부 데이터 잔존 가능성 있음",
+    ],
+  },
+  {
+    id:"srum", icon:"📊", name:"SRUM", subtitle:"System Resource Usage Monitor",
+    color:"#a29bfe", category:"네트워크",
+    summary:"Windows 8 이후 도입. 모든 프로세스의 네트워크 사용량·CPU·메모리를 최대 30일간 기록하는 ESE 데이터베이스. 악성 파일이 삭제된 후에도 통신 이력과 유출량을 증명할 수 있다.",
+    locations:[
+      { path:"C:\\Windows\\System32\\sru\\SRUDB.dat", desc:"SRUM 메인 DB (ESE 형식)" },
+      { path:"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SRUM\\Extensions\\", desc:"SRUM 확장 설정 레지스트리" },
+    ],
+    tools:[
+      { name:"SrumECmd", desc:"Eric Zimmerman SRUM 파서. 네트워크·앱 사용량 CSV 출력", cmd:"SrumECmd.exe -f SRUDB.dat --csv output\\ --csvf srum.csv" },
+      { name:"srum-dump", desc:"오픈소스 Python 파서", cmd:"python srum_dump.py SRUDB.dat -t SOFTWARE -o output.xlsx" },
+    ],
+    keyItems:[
+      {
+        name:"네트워크 사용량 ({DD6636C4-...} 테이블)", threat:true,
+        desc:"프로세스별 네트워크 송수신 바이트를 시간대별로 기록. 데이터 유출 규모와 시점을 정확히 측정.",
+        parse_output:`[네트워크 사용량 테이블]
+TimeStamp              ExeInfo                                    UserId   BytesSent    BytesRecvd   ConnectStartTime
+---------------------------------------------------------------------------------------------------------------------------------
+2024-09-02 09:35:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe  S-1-5-18  1024         48620        2024-09-02 09:35:01
+2024-09-02 10:00:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe  S-1-5-18  2048         52428        2024-09-02 09:35:01
+2024-09-10 22:30:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe  S-1-5-18  487302144    12288        2024-09-10 22:30:05  ← 대용량 송신!
+2024-09-10 22:30:00    C:\\Windows\\System32\\svchost.exe             S-1-5-18  128          24576        -
+2024-09-15 03:00:00    (삭제된 파일 경로)\\svcupd.exe                S-1-5-18  1024         512          2024-09-15 02:59:00`,
+        interpretation:[
+          { field:"ExeInfo (실행 파일 경로)", meaning:"파일이 삭제된 후에도 경로 기록이 30일간 유지됨. 삭제된 악성 파일의 통신 이력 증명 가능" },
+          { field:"BytesSent (송신 바이트)", meaning:"외부로 전송한 데이터량. 대용량(수십~수백 MB) 송신은 데이터 유출 강력 의심. 487MB = 압축 파일 크기와 일치하면 확정" },
+          { field:"BytesRecvd (수신 바이트)", meaning:"C2에서 받은 데이터. 명령·페이로드 수신 패턴. 주기적 수신은 비콘 통신" },
+          { field:"ConnectStartTime", meaning:"TCP 연결 시작 시간. 네트워크 연결의 정확한 시작 시점 추적 가능" },
+          { field:"UserId (SID)", meaning:"해당 통신을 수행한 계정의 SID. S-1-5-18=SYSTEM 권한으로 실행된 프로세스" },
+        ],
+        forensic:"BytesSent가 수백 MB인 프로세스 → 유출 주체. 유출 시간 + MFT 압축 파일 크기 + 브라우저 업로드 기록 3중 교차 검증.",
+        ioc:"svcupd.exe BytesSent: 487,302,144 bytes (09-10 22:30), 비정상 경로 프로세스 대용량 송신",
+      },
+      {
+        name:"앱 리소스 사용량 ({973F5D5C-...} 테이블)", threat:false,
+        desc:"CPU·메모리·포그라운드/백그라운드 실행 시간 기록. 프로세스가 언제 얼마나 실행됐는지 파악.",
+        parse_output:`[앱 리소스 테이블]
+TimeStamp              ExeInfo                                    ForegroundCycleTime  BackgroundCycleTime  ForegroundContextSwitches
+------------------------------------------------------------------------------------------------------------------------------------------------
+2024-09-02 09:32:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe  0                    8923756281           45231    ← 백그라운드만 실행
+2024-09-02 09:31:00    C:\\Windows\\System32\\cmd.exe                 1234567890           0                    892
+2024-09-02 09:31:00    C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe  9876543210  2345678901  15432`,
+        interpretation:[
+          { field:"ForegroundCycleTime=0, BackgroundCycleTime 존재", meaning:"사용자 화면에 표시 없이 백그라운드에서만 실행됨. 악성코드의 전형적인 실행 패턴" },
+          { field:"CPU 사이클 시간", meaning:"높은 값 = 많은 CPU 사용. 암호화(랜섬웨어), 해시 크래킹, 대용량 파일 압축 시 높게 나타남" },
+        ],
+        forensic:"ForegroundCycleTime=0인 악성 프로세스는 사용자 몰래 백그라운드 실행 중인 악성코드.",
+        ioc:"백그라운드 전용 실행(ForegroundCycleTime=0), 비정상 경로 프로세스 높은 CPU 사용",
+      },
+    ],
+    tips:[
+      "SRUM은 현재 운영 중인 시스템에서는 잠금 상태 → 오프라인 분석 또는 볼륨 섀도 복사본 활용",
+      "SrumECmd 실행 시 SOFTWARE 하이브도 함께 제공해야 앱 이름 정확히 매핑됨",
+      "30일이 지난 데이터는 자동 삭제. 최대한 빠른 수집이 중요",
+      "프로세스 경로가 없는 SID 항목은 삭제된 서비스 계정이나 도메인 계정일 수 있음",
+      "타임스탬프는 UTC 기준 1시간 단위 집계. ConnectStartTime으로 정확한 시작 시간 확인",
     ],
   },
 ];
 
 const CAT_COLOR = {
-  로그: "#4cc9f0", 설정: "#d2a8ff", 실행흔적: "#ffd166",
-  파일시스템: "#06d6a0", 사용자행위: "#ffa657", 네트워크: "#a29bfe",
+  로그:"#4cc9f0", 설정:"#d2a8ff", 실행흔적:"#ffd166",
+  파일시스템:"#06d6a0", 사용자행위:"#ffa657", 네트워크:"#a29bfe",
 };
-
-const TABS_OTHER = [
-  { id: "overview", label: "개요",    icon: "📌" },
-  { id: "events",   label: "핵심항목", icon: "🔑" },
-  { id: "tips",     label: "조사팁",  icon: "💡" },
-  { id: "tools",    label: "도구",    icon: "🛠" },
-];
 
 // ══════════════════════════════════════════════════════
 // 레지스트리 하이브 & 키 데이터베이스
@@ -1019,7 +1439,7 @@ export default function ArtifactGuide() {
   const [keyTab, setKeyTab]       = useState("parse");
 
   // 기타 아티팩트 관련
-  const [selectedArt, setSelectedArt] = useState(OTHER_ARTIFACTS[0]);
+  // selectedArt는 ArtifactDetailMode 내부로 이동됨
   const [artTab, setArtTab]       = useState("overview");
   const [showArtList, setShowArtList] = useState(false);
 
@@ -1423,155 +1843,7 @@ export default function ArtifactGuide() {
 
       {/* ══════════════ 아티팩트 가이드 모드 ══════════════ */}
       {mode === "artifact" && (
-        <>
-          {/* 아티팩트 헤더 */}
-          <div style={{ background:"#0d1117", borderBottom:"1px solid #21262d", padding:"10px 14px", display:"flex", alignItems:"center", gap:10, position:"sticky", top:49, zIndex:50 }}>
-            <button onClick={() => setShowArtList(v=>!v)} style={{
-              background:showArtList?selectedArt.color+"33":"#21262d",
-              border:`1px solid ${showArtList?selectedArt.color+"55":"#30363d"}`,
-              borderRadius:8, padding:"7px 11px", color:showArtList?selectedArt.color:"#8b949e",
-              cursor:"pointer", fontSize:16, flexShrink:0,
-            }}>☰</button>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
-                <span style={{ fontSize:18 }}>{selectedArt.icon}</span>
-                <span style={{ fontWeight:700, fontSize:14 }}>{selectedArt.name}</span>
-                <span style={{ background:CAT_COLOR[selectedArt.category]+"22", color:CAT_COLOR[selectedArt.category], border:`1px solid ${CAT_COLOR[selectedArt.category]}44`, borderRadius:10, padding:"1px 7px", fontSize:10, fontWeight:700 }}>{selectedArt.category}</span>
-              </div>
-              <div style={{ color:"#8b949e", fontSize:11, marginTop:1 }}>{selectedArt.subtitle}</div>
-            </div>
-            {/* 이전/다음 */}
-            {(() => {
-              const idx = OTHER_ARTIFACTS.findIndex(a => a.id === selectedArt.id);
-              const prev = OTHER_ARTIFACTS[idx-1];
-              const next = OTHER_ARTIFACTS[idx+1];
-              return (
-                <div style={{ display:"flex", gap:4, flexShrink:0 }}>
-                  <button onClick={() => prev && (setSelectedArt(prev), setArtTab("overview"))} style={{ background:prev?"#21262d":"transparent", border:`1px solid ${prev?"#30363d":"#21262d"}`, borderRadius:6, padding:"6px 10px", color:prev?"#e6edf3":"#30363d", cursor:prev?"pointer":"default", fontSize:14 }}>‹</button>
-                  <button onClick={() => next && (setSelectedArt(next), setArtTab("overview"))} style={{ background:next?"#21262d":"transparent", border:`1px solid ${next?"#30363d":"#21262d"}`, borderRadius:6, padding:"6px 10px", color:next?"#e6edf3":"#30363d", cursor:next?"pointer":"default", fontSize:14 }}>›</button>
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* 드로어 */}
-          {showArtList && (
-            <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex" }}>
-              <div onClick={() => setShowArtList(false)} style={{ position:"absolute", inset:0, background:"#00000088" }}/>
-              <div style={{ position:"relative", width:"80%", maxWidth:300, background:"#0d1117", height:"100%", overflowY:"auto", padding:"16px 12px", borderRight:"1px solid #21262d" }}>
-                <div style={{ fontWeight:700, fontSize:14, padding:"4px 8px 12px", borderBottom:"1px solid #21262d", marginBottom:10 }}>🗂 아티팩트 선택</div>
-                {OTHER_ARTIFACTS.map(a => (
-                  <button key={a.id} onClick={() => { setSelectedArt(a); setArtTab("overview"); setShowArtList(false); }} style={{ width:"100%", textAlign:"left", padding:"11px 12px", borderRadius:9, border:"none", cursor:"pointer", background:selectedArt.id===a.id?a.color+"22":"transparent", borderLeft:`3px solid ${selectedArt.id===a.id?a.color:"transparent"}`, marginBottom:3, display:"flex", alignItems:"center", gap:10 }}>
-                    <span style={{ fontSize:20 }}>{a.icon}</span>
-                    <div>
-                      <div style={{ color:selectedArt.id===a.id?a.color:"#e6edf3", fontSize:13, fontWeight:selectedArt.id===a.id?700:400 }}>{a.name}</div>
-                      <div style={{ color:"#8b949e", fontSize:10 }}>{a.subtitle}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 탭 바 */}
-          <div style={{ display:"flex", background:"#0d1117", borderBottom:"1px solid #21262d", position:"sticky", top:97, zIndex:40 }}>
-            {TABS_OTHER.map(t => (
-              <button key={t.id} onClick={() => setArtTab(t.id)} style={{ flex:1, padding:"10px 4px", border:"none", cursor:"pointer", background:"none", display:"flex", flexDirection:"column", alignItems:"center", gap:2, color:artTab===t.id?selectedArt.color:"#8b949e", borderBottom:`2px solid ${artTab===t.id?selectedArt.color:"transparent"}`, fontSize:10, fontWeight:artTab===t.id?700:400 }}>
-                <span style={{ fontSize:16 }}>{t.icon}</span>
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          {/* 아티팩트 콘텐츠 */}
-          <div style={{ flex:1, padding:16, paddingBottom:80 }}>
-            {artTab==="overview" && (
-              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                <div style={{ background:selectedArt.color+"12", border:`1px solid ${selectedArt.color}33`, borderLeft:`4px solid ${selectedArt.color}`, borderRadius:10, padding:"14px 16px", display:"flex", gap:10 }}>
-                  <span style={{ fontSize:20, flexShrink:0 }}>⭐</span>
-                  <div style={{ color:"#e6edf3", fontSize:13, lineHeight:1.7 }}>{selectedArt.summary}</div>
-                </div>
-                <div style={{ background:"#161b22", border:"1px solid #21262d", borderRadius:10, padding:"14px 16px" }}>
-                  <div style={{ color:"#8b949e", fontSize:11, marginBottom:8 }}>📍 파일 위치</div>
-                  <div style={{ color:selectedArt.color, fontFamily:"monospace", fontSize:12, wordBreak:"break-all", whiteSpace:"pre-line", lineHeight:1.7 }}>{selectedArt.location}</div>
-                </div>
-                <div style={{ background:"#161b22", border:"1px solid #21262d", borderRadius:10, padding:"14px 16px" }}>
-                  <div style={{ color:"#8b949e", fontSize:11, marginBottom:10 }}>📄 주요 파일</div>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
-                    {selectedArt.files.map((f,i) => (
-                      <span key={i} style={{ background:"#21262d", border:"1px solid #30363d", borderRadius:6, padding:"5px 10px", fontFamily:"monospace", color:"#e6edf3", fontSize:11 }}>{f}</span>
-                    ))}
-                  </div>
-                </div>
-                <div style={{ background:selectedArt.color+"0d", border:`1px solid ${selectedArt.color}33`, borderRadius:10, padding:"14px 16px" }}>
-                  <div style={{ color:selectedArt.color, fontSize:11, fontWeight:700, marginBottom:8 }}>🔎 알 수 있는 것</div>
-                  <div style={{ color:"#e6edf3", fontSize:13, lineHeight:1.8 }}>{selectedArt.whatYouCanFind}</div>
-                </div>
-                <div style={{ display:"flex", justifyContent:"center", gap:5, paddingTop:4 }}>
-                  {OTHER_ARTIFACTS.map(a => (
-                    <div key={a.id} onClick={() => { setSelectedArt(a); setArtTab("overview"); }} style={{ width:selectedArt.id===a.id?22:6, height:6, borderRadius:3, background:selectedArt.id===a.id?selectedArt.color:"#30363d", cursor:"pointer", transition:"all .2s" }}/>
-                  ))}
-                </div>
-              </div>
-            )}
-            {artTab==="events" && (
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                <div style={{ background:"#ff4d6d10", border:"1px solid #ff4d6d30", borderRadius:8, padding:"10px 12px", marginBottom:4, color:"#ff7b7b", fontSize:12 }}>⚠ 빨간 항목은 침해사고 시 특히 주목할 지표입니다.</div>
-                {selectedArt.keyEvents.map((e,i) => (
-                  <div key={i} style={{ background:e.threat?"#ff4d6d0d":"#161b22", border:`1px solid ${e.threat?"#ff4d6d33":"#21262d"}`, borderLeft:`4px solid ${e.threat?"#ff4d6d":selectedArt.color}`, borderRadius:8, padding:"12px 14px" }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8, marginBottom:5 }}>
-                      <span style={{ background:e.threat?"#ff4d6d22":selectedArt.color+"22", color:e.threat?"#ff4d6d":selectedArt.color, borderRadius:5, padding:"2px 8px", fontFamily:"monospace", fontSize:11, fontWeight:700 }}>{e.id}</span>
-                      {e.threat && <span style={{ background:"#ff4d6d22", color:"#ff4d6d", border:"1px solid #ff4d6d44", borderRadius:4, padding:"2px 6px", fontSize:10, fontWeight:700 }}>⚠ 위협</span>}
-                    </div>
-                    <div style={{ color:e.threat?"#ffaaaa":"#e6edf3", fontSize:13, lineHeight:1.6 }}>{e.desc}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {artTab==="tips" && (
-              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                {selectedArt.tips.map((tip,i) => (
-                  <div key={i} style={{ background:"#161b22", border:"1px solid #21262d", borderRadius:10, padding:"14px 16px", display:"flex", gap:12, alignItems:"flex-start" }}>
-                    <div style={{ background:selectedArt.color+"22", color:selectedArt.color, borderRadius:"50%", width:28, height:28, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800 }}>{i+1}</div>
-                    <div style={{ color:"#e6edf3", fontSize:13, lineHeight:1.7, paddingTop:3 }}>{tip}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {artTab==="tools" && (
-              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                {selectedArt.tools.map((tool,i) => (
-                  <div key={i} style={{ background:"#161b22", border:"1px solid #21262d", borderRadius:10, padding:"14px 16px", display:"flex", alignItems:"center", gap:12 }}>
-                    <div style={{ background:selectedArt.color+"22", borderRadius:8, width:42, height:42, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🛠</div>
-                    <div>
-                      <div style={{ color:selectedArt.color, fontWeight:700, fontSize:14 }}>{tool}</div>
-                      <div style={{ color:"#8b949e", fontSize:11, marginTop:2 }}>
-                        {tool.includes("ECmd")||tool.includes("Explorer")?"Eric Zimmerman Tools (무료)":tool.includes("Autopsy")?"오픈소스 포렌식 플랫폼":tool.includes("Viewer")?"Windows 내장 도구":tool.includes("SQLite")?"DB Browser (무료)":"무료 / 오픈소스"}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 하단 이전/다음 */}
-          {(() => {
-            const idx = OTHER_ARTIFACTS.findIndex(a => a.id === selectedArt.id);
-            const prev = OTHER_ARTIFACTS[idx-1];
-            const next = OTHER_ARTIFACTS[idx+1];
-            return (
-              <div style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:480, background:"#0d1117", borderTop:"1px solid #21262d", padding:"10px 16px", display:"flex", gap:10 }}>
-                <button onClick={() => prev && (setSelectedArt(prev), setArtTab("overview"))} style={{ flex:1, padding:"11px 8px", borderRadius:10, border:"none", background:prev?"#161b22":"transparent", border:`1px solid ${prev?"#30363d":"#21262d"}`, color:prev?"#e6edf3":"#30363d", cursor:prev?"pointer":"default", display:"flex", alignItems:"center", justifyContent:"center", gap:5, fontSize:12 }}>
-                  {prev?<>‹ <span>{prev.icon}</span><span style={{fontSize:11}}>{prev.name}</span></>:<span>처음</span>}
-                </button>
-                <button onClick={() => next && (setSelectedArt(next), setArtTab("overview"))} style={{ flex:1, padding:"11px 8px", borderRadius:10, border:"none", background:next?selectedArt.color+"22":"transparent", border:`1px solid ${next?selectedArt.color+"55":"#21262d"}`, color:next?selectedArt.color:"#30363d", cursor:next?"pointer":"default", display:"flex", alignItems:"center", justifyContent:"center", gap:5, fontSize:12 }}>
-                  {next?<><span style={{fontSize:11}}>{next.name}</span><span>{next.icon}</span> ›</>:<span>마지막</span>}
-                </button>
-              </div>
-            );
-          })()}
-        </>
+        <ArtifactDetailMode />
       )}
 
       {/* ══════════════ 이벤트 상세 모달 ══════════════ */}
@@ -1611,6 +1883,263 @@ export default function ArtifactGuide() {
         </div>
       )}
     </div>
+  );
+}
+
+// ── 아티팩트 상세 모드 컴포넌트 ──────────────────────────────
+function ArtifactDetailMode() {
+  const [selId, setSelId]         = useState(ARTIFACTS_DETAIL[0].id);
+  const [mainTab, setMainTab]     = useState("overview"); // overview | keyitems | tools | tips
+  const [showList, setShowList]   = useState(false);
+  const [selItem, setSelItem]     = useState(null);
+  const [itemTab, setItemTab]     = useState("parse");
+  const [fileFilter, setFileFilter] = useState("all");
+
+  const art = ARTIFACTS_DETAIL.find(a => a.id === selId);
+  const idx = ARTIFACTS_DETAIL.findIndex(a => a.id === selId);
+  const prev = ARTIFACTS_DETAIL[idx-1];
+  const next = ARTIFACTS_DETAIL[idx+1];
+
+  const goArt = (id) => { setSelId(id); setMainTab("overview"); setShowList(false); setSelItem(null); setFileFilter("all"); };
+
+  // keyItems 필터
+  const filteredItems = art.keyItems
+    ? (fileFilter==="all" ? art.keyItems : art.keyItems.filter(k => k.file===fileFilter))
+    : [];
+
+  const FILE_LABEL_COLORS = { "$MFT":"#06d6a0", "$LogFile":"#4cc9f0", "$UsnJrnl":"#ffd166" };
+
+  return (
+    <>
+      {/* 헤더 */}
+      <div style={{ background:"#0d1117", borderBottom:"1px solid #21262d", padding:"10px 14px", display:"flex", alignItems:"center", gap:10, position:"sticky", top:49, zIndex:50 }}>
+        <button onClick={()=>setShowList(v=>!v)} style={{ background:showList?art.color+"33":"#21262d", border:`1px solid ${showList?art.color+"55":"#30363d"}`, borderRadius:8, padding:"7px 11px", color:showList?art.color:"#8b949e", cursor:"pointer", fontSize:16, flexShrink:0 }}>☰</button>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+            <span style={{ fontSize:18 }}>{art.icon}</span>
+            <span style={{ fontWeight:700, fontSize:13, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{art.name}</span>
+            <span style={{ background:art.color+"22", color:art.color, borderRadius:10, padding:"1px 7px", fontSize:9, fontWeight:700, flexShrink:0 }}>{art.category}</span>
+          </div>
+          <div style={{ color:"#8b949e", fontSize:10, marginTop:1 }}>{art.subtitle}</div>
+        </div>
+        <div style={{ display:"flex", gap:4, flexShrink:0 }}>
+          <button onClick={()=>prev&&goArt(prev.id)} style={{ background:prev?"#21262d":"transparent", border:`1px solid ${prev?"#30363d":"#21262d"}`, borderRadius:6, padding:"6px 10px", color:prev?"#e6edf3":"#30363d", cursor:prev?"pointer":"default", fontSize:14 }}>‹</button>
+          <button onClick={()=>next&&goArt(next.id)} style={{ background:next?"#21262d":"transparent", border:`1px solid ${next?"#30363d":"#21262d"}`, borderRadius:6, padding:"6px 10px", color:next?"#e6edf3":"#30363d", cursor:next?"pointer":"default", fontSize:14 }}>›</button>
+        </div>
+      </div>
+
+      {/* 드로어 */}
+      {showList && (
+        <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex" }}>
+          <div onClick={()=>setShowList(false)} style={{ position:"absolute", inset:0, background:"#00000088" }}/>
+          <div style={{ position:"relative", width:"80%", maxWidth:300, background:"#0d1117", height:"100%", overflowY:"auto", padding:"16px 12px", borderRight:"1px solid #21262d" }}>
+            <div style={{ fontWeight:700, fontSize:14, padding:"4px 8px 12px", borderBottom:"1px solid #21262d", marginBottom:10 }}>🗂 아티팩트 선택</div>
+            {ARTIFACTS_DETAIL.map(a => (
+              <button key={a.id} onClick={()=>goArt(a.id)} style={{ width:"100%", textAlign:"left", padding:"11px 12px", borderRadius:9, border:"none", cursor:"pointer", background:selId===a.id?a.color+"22":"transparent", borderLeft:`3px solid ${selId===a.id?a.color:"transparent"}`, marginBottom:3, display:"flex", alignItems:"center", gap:10 }}>
+                <span style={{ fontSize:20 }}>{a.icon}</span>
+                <div>
+                  <div style={{ color:selId===a.id?a.color:"#e6edf3", fontSize:12, fontWeight:selId===a.id?700:400 }}>{a.name}</div>
+                  <div style={{ color:"#8b949e", fontSize:10 }}>{a.subtitle}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 메인 탭 바 */}
+      <div style={{ display:"flex", background:"#0d1117", borderBottom:"1px solid #21262d", position:"sticky", top:97, zIndex:40 }}>
+        {[{id:"overview",label:"개요",icon:"📌"},{id:"keyitems",label:"핵심항목",icon:"🔑"},{id:"tools",label:"도구",icon:"🛠"},{id:"tips",label:"팁",icon:"💡"}].map(t => (
+          <button key={t.id} onClick={()=>setMainTab(t.id)} style={{ flex:1, padding:"9px 4px", border:"none", cursor:"pointer", background:"none", display:"flex", flexDirection:"column", alignItems:"center", gap:1, color:mainTab===t.id?art.color:"#8b949e", borderBottom:`2px solid ${mainTab===t.id?art.color:"transparent"}`, fontSize:10, fontWeight:mainTab===t.id?700:400 }}>
+            <span style={{ fontSize:15 }}>{t.icon}</span>{t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 콘텐츠 */}
+      <div style={{ flex:1, padding:14, paddingBottom:90 }}>
+
+        {/* 개요 탭 */}
+        {mainTab==="overview" && (
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            <div style={{ background:art.color+"12", border:`1px solid ${art.color}33`, borderLeft:`4px solid ${art.color}`, borderRadius:10, padding:"13px 15px", display:"flex", gap:10 }}>
+              <span style={{ fontSize:18, flexShrink:0 }}>⭐</span>
+              <div style={{ color:"#e6edf3", fontSize:12, lineHeight:1.7 }}>{art.summary}</div>
+            </div>
+
+            {/* 파일 위치 목록 */}
+            <div style={{ background:"#161b22", border:"1px solid #21262d", borderRadius:10, padding:"13px 15px" }}>
+              <div style={{ color:"#8b949e", fontSize:11, marginBottom:10 }}>📍 파일 위치 (전체)</div>
+              {art.locations.map((loc,i) => (
+                <div key={i} style={{ marginBottom:10, paddingBottom:10, borderBottom:i<art.locations.length-1?"1px solid #21262d":"none" }}>
+                  <code style={{ color:art.color, fontSize:10, fontFamily:"monospace", wordBreak:"break-all", display:"block", marginBottom:3 }}>{loc.path}</code>
+                  <div style={{ color:"#8b949e", fontSize:11 }}>{loc.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* fileSections 있으면 구조 설명 */}
+            {art.fileSections && (
+              <div style={{ background:"#0d1117", border:"1px solid #21262d", borderRadius:10, padding:"13px 15px" }}>
+                <div style={{ color:"#8b949e", fontSize:11, marginBottom:8 }}>📂 구성 파일</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                  {art.fileSections.map(fs => (
+                    <div key={fs.id} style={{ background:fs.color+"15", border:`1px solid ${fs.color}33`, borderLeft:`3px solid ${fs.color}`, borderRadius:7, padding:"8px 12px", display:"flex", alignItems:"center", gap:8 }}>
+                      <span style={{ color:fs.color, fontFamily:"monospace", fontWeight:800, fontSize:12 }}>{fs.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 도트 인디케이터 */}
+            <div style={{ display:"flex", justifyContent:"center", gap:5, paddingTop:4 }}>
+              {ARTIFACTS_DETAIL.map(a => (
+                <div key={a.id} onClick={()=>goArt(a.id)} style={{ width:selId===a.id?22:6, height:6, borderRadius:3, background:selId===a.id?art.color:"#30363d", cursor:"pointer", transition:"all .2s" }}/>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 핵심 항목 탭 */}
+        {mainTab==="keyitems" && (
+          <div>
+            {/* 파일 필터 (fileSections 있는 경우만) */}
+            {art.fileSections && (
+              <div style={{ display:"flex", gap:5, marginBottom:12, overflowX:"auto" }}>
+                <button onClick={()=>setFileFilter("all")} style={{ padding:"4px 10px", borderRadius:20, border:"none", cursor:"pointer", flexShrink:0, background:fileFilter==="all"?art.color+"33":"#21262d", color:fileFilter==="all"?art.color:"#8b949e", border:`1px solid ${fileFilter==="all"?art.color+"55":"#30363d"}`, fontSize:10, fontWeight:700 }}>전체</button>
+                {art.fileSections.map(fs => (
+                  <button key={fs.id} onClick={()=>setFileFilter(fs.label.replace(/📄|📝|📋|\s/g,""))} style={{ padding:"4px 10px", borderRadius:20, border:"none", cursor:"pointer", flexShrink:0, background:fileFilter===fs.label.replace(/📄|📝|📋|\s/g,"")?fs.color+"33":"#21262d", color:fileFilter===fs.label.replace(/📄|📝|📋|\s/g,"")?fs.color:"#8b949e", border:`1px solid ${fileFilter===fs.label.replace(/📄|📝|📋|\s/g,"")?fs.color+"55":"#30363d"}`, fontSize:10, fontWeight:700 }}>{fs.label}</button>
+                ))}
+              </div>
+            )}
+
+            {/* 항목 카드 목록 */}
+            {filteredItems.map((item,i) => {
+              const fileLabelColor = item.file ? (FILE_LABEL_COLORS[item.file]||art.color) : art.color;
+              return (
+                <button key={i} onClick={()=>{setSelItem(item);setItemTab("parse");}} style={{
+                  width:"100%", textAlign:"left",
+                  background:item.threat?"#ff4d6d08":"#161b22",
+                  border:`1px solid ${item.threat?"#ff4d6d33":"#21262d"}`,
+                  borderLeft:`4px solid ${item.threat?"#ff4d6d":fileLabelColor}`,
+                  borderRadius:10, padding:"12px 13px", marginBottom:7, cursor:"pointer",
+                  display:"flex", gap:10, alignItems:"flex-start",
+                }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap", marginBottom:4 }}>
+                      {item.file && <span style={{ background:fileLabelColor+"22", color:fileLabelColor, borderRadius:4, padding:"1px 6px", fontSize:9, fontFamily:"monospace", fontWeight:800 }}>{item.file}</span>}
+                      <span style={{ color:item.threat?"#ffaaaa":"#e6edf3", fontWeight:700, fontSize:12 }}>{item.name}</span>
+                      {item.threat && <span style={{ background:"#ff4d6d22", color:"#ff4d6d", borderRadius:4, padding:"1px 5px", fontSize:9, fontWeight:700 }}>⚠</span>}
+                    </div>
+                    <div style={{ color:"#8b949e", fontSize:11, lineHeight:1.5 }}>{item.desc}</div>
+                  </div>
+                  <span style={{ color:"#444c56", fontSize:14, flexShrink:0 }}>›</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* 도구 탭 */}
+        {mainTab==="tools" && (
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {art.tools.map((tool,i) => (
+              <div key={i} style={{ background:"#161b22", border:"1px solid #21262d", borderRadius:10, padding:"13px 15px" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+                  <div style={{ background:art.color+"22", borderRadius:7, width:38, height:38, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🛠</div>
+                  <div>
+                    <div style={{ color:art.color, fontWeight:700, fontSize:13 }}>{tool.name}</div>
+                    <div style={{ color:"#8b949e", fontSize:11, marginTop:1 }}>{tool.desc}</div>
+                  </div>
+                </div>
+                {tool.cmd && <code style={{ display:"block", background:"#0d1117", border:"1px solid #30363d", borderRadius:6, padding:"8px 10px", color:"#06d6a0", fontSize:10, fontFamily:"monospace", wordBreak:"break-all", lineHeight:1.6 }}>{tool.cmd}</code>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 팁 탭 */}
+        {mainTab==="tips" && (
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {art.tips.map((tip,i) => (
+              <div key={i} style={{ background:"#161b22", border:"1px solid #21262d", borderRadius:10, padding:"13px 15px", display:"flex", gap:10, alignItems:"flex-start" }}>
+                <div style={{ background:art.color+"22", color:art.color, borderRadius:"50%", width:26, height:26, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:800 }}>{i+1}</div>
+                <div style={{ color:"#e6edf3", fontSize:12, lineHeight:1.7, paddingTop:2 }}>{tip}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 하단 이전/다음 */}
+      <div style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:480, background:"#0d1117", borderTop:"1px solid #21262d", padding:"10px 14px", display:"flex", gap:10 }}>
+        <button onClick={()=>prev&&goArt(prev.id)} style={{ flex:1, padding:"10px 8px", borderRadius:10, border:"none", background:prev?"#161b22":"transparent", border:`1px solid ${prev?"#30363d":"#21262d"}`, color:prev?"#e6edf3":"#30363d", cursor:prev?"pointer":"default", display:"flex", alignItems:"center", justifyContent:"center", gap:5, fontSize:11 }}>
+          {prev?<>‹ <span>{prev.icon}</span><span>{prev.name.length>10?prev.name.slice(0,10)+"…":prev.name}</span></>:<span>처음</span>}
+        </button>
+        <button onClick={()=>next&&goArt(next.id)} style={{ flex:1, padding:"10px 8px", borderRadius:10, border:"none", background:next?art.color+"22":"transparent", border:`1px solid ${next?art.color+"55":"#21262d"}`, color:next?art.color:"#30363d", cursor:next?"pointer":"default", display:"flex", alignItems:"center", justifyContent:"center", gap:5, fontSize:11 }}>
+          {next?<><span>{next.name.length>10?next.name.slice(0,10)+"…":next.name}</span><span>{next.icon}</span>›</>:<span>마지막</span>}
+        </button>
+      </div>
+
+      {/* 핵심 항목 상세 바텀시트 */}
+      {selItem && (
+        <div onClick={()=>setSelItem(null)} style={{ position:"fixed", inset:0, background:"#00000090", zIndex:200, display:"flex", alignItems:"flex-end" }}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:"#161b22", border:`1px solid ${art.color}44`, borderRadius:"16px 16px 0 0", padding:"16px 15px", width:"100%", maxWidth:480, margin:"0 auto", maxHeight:"88vh", overflowY:"auto" }}>
+            <div style={{ width:36, height:4, background:"#30363d", borderRadius:2, margin:"0 auto 14px" }}/>
+
+            {/* 항목 헤더 */}
+            <div style={{ marginBottom:12 }}>
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:5 }}>
+                {selItem.file && <span style={{ background:(FILE_LABEL_COLORS[selItem.file]||art.color)+"22", color:FILE_LABEL_COLORS[selItem.file]||art.color, borderRadius:4, padding:"2px 8px", fontSize:10, fontFamily:"monospace", fontWeight:800 }}>{selItem.file}</span>}
+                {selItem.threat && <span style={{ background:"#ff4d6d22", color:"#ff4d6d", borderRadius:4, padding:"2px 7px", fontSize:10, fontWeight:700 }}>⚠ 위협 지표</span>}
+              </div>
+              <div style={{ fontWeight:800, fontSize:15, color:"#e6edf3", marginBottom:4 }}>{selItem.name}</div>
+              <div style={{ color:"#8b949e", fontSize:12, lineHeight:1.6 }}>{selItem.desc}</div>
+            </div>
+
+            {/* 탭 */}
+            <div style={{ display:"flex", gap:0, borderBottom:"1px solid #21262d", marginBottom:12 }}>
+              {[{id:"parse",label:"📊 파싱 결과"},{id:"interpret",label:"🔎 필드 해석"},{id:"forensic",label:"🕵️ 포렌식"}].map(t => (
+                <button key={t.id} onClick={()=>setItemTab(t.id)} style={{ flex:1, padding:"8px 4px", border:"none", cursor:"pointer", background:"none", color:itemTab===t.id?art.color:"#8b949e", borderBottom:`2px solid ${itemTab===t.id?art.color:"transparent"}`, fontSize:10, fontWeight:itemTab===t.id?700:400 }}>{t.label}</button>
+              ))}
+            </div>
+
+            {itemTab==="parse" && (
+              <div style={{ background:"#0d1117", border:"1px solid #30363d", borderRadius:8, padding:"11px 12px", overflowX:"auto" }}>
+                <pre style={{ color:"#e6edf3", fontSize:10, fontFamily:"monospace", margin:0, lineHeight:1.8, whiteSpace:"pre-wrap", wordBreak:"break-all" }}>{selItem.parse_output}</pre>
+              </div>
+            )}
+
+            {itemTab==="interpret" && (
+              <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
+                {selItem.interpretation.map((item,i) => (
+                  <div key={i} style={{ background:"#0d1117", border:"1px solid #21262d", borderRadius:8, padding:"10px 12px" }}>
+                    <div style={{ color:art.color, fontWeight:700, fontSize:11, fontFamily:"monospace", marginBottom:4 }}>{item.field}</div>
+                    <div style={{ color:"#e6edf3", fontSize:11, lineHeight:1.6 }}>{item.meaning}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {itemTab==="forensic" && (
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                <div style={{ background:"#ffd16610", border:"1px solid #ffd16630", borderLeft:"3px solid #ffd166", borderRadius:8, padding:"10px 12px" }}>
+                  <div style={{ color:"#ffd166", fontWeight:700, fontSize:11, marginBottom:4 }}>🕵️ 포렌식 분석 포인트</div>
+                  <div style={{ color:"#e6edf3", fontSize:11, lineHeight:1.7 }}>{selItem.forensic}</div>
+                </div>
+                <div style={{ background:"#ff4d6d0d", border:"1px solid #ff4d6d33", borderLeft:"3px solid #ff4d6d", borderRadius:8, padding:"10px 12px" }}>
+                  <div style={{ color:"#ff4d6d", fontWeight:700, fontSize:11, marginBottom:4 }}>🚨 IOC / 의심 패턴</div>
+                  <pre style={{ color:"#ff7b7b", fontSize:11, fontFamily:"monospace", margin:0, lineHeight:1.8, whiteSpace:"pre-wrap" }}>{selItem.ioc}</pre>
+                </div>
+              </div>
+            )}
+
+            <button onClick={()=>setSelItem(null)} style={{ width:"100%", background:"#21262d", border:"none", borderRadius:9, padding:"11px", cursor:"pointer", color:"#e6edf3", fontSize:13, fontWeight:700, marginTop:12 }}>닫기</button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
