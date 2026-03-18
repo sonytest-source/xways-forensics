@@ -1395,7 +1395,7 @@ schtasks /query /fo LIST /v | findstr "작업 이름\|실행\|상태"`,
         type:"powershell", threat:true,
         cmd:`Get-WmiObject Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine |
 ForEach-Object {
-  $parent = Get-WmiObject Win32_Process -Filter "ProcessId=$($_.ParentProcessId)"
+  $parent = Get-WmiObject Win32_Process -Filter "ProcessId=\$(\$_.ParentProcessId)"
   [PSCustomObject]@{
     PID=$_.ProcessId; Name=$_.Name;
     ParentName=$parent.Name; ParentPID=$_.ParentProcessId;
@@ -1611,26 +1611,7 @@ Dump 1 complete: 45 MB written in 0.8 seconds`,
       {
         name:"휘발성 정보 일괄 수집 스크립트",
         type:"powershell", threat:false,
-        cmd:`# IR 수집 폴더 생성
-$IRPath = "C:\IR_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-New-Item -ItemType Directory $IRPath
-
-# 시스템 정보
-systeminfo > "$IRPath\systeminfo.txt"
-date /t >> "$IRPath\systeminfo.txt"
-time /t >> "$IRPath\systeminfo.txt"
-
-# 프로세스·네트워크·계정
-tasklist /v /fo csv > "$IRPath\processes.csv"
-netstat -ano > "$IRPath\netstat.txt"
-net user > "$IRPath\users.txt"
-net localgroup administrators > "$IRPath\admins.txt"
-ipconfig /displaydns > "$IRPath\dns_cache.txt"
-net share > "$IRPath\shares.txt"
-schtasks /query /fo CSV /v > "$IRPath\tasks.csv"
-reg query HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run > "$IRPath\run_keys.txt"
-
-Write-Host "수집 완료: $IRPath"`,
+        cmd:"# IR 수집 폴더 생성\n$IRPath = \"C:\\IR_$(Get-Date -Format 'yyyyMMdd_HHmmss')\"\nNew-Item -ItemType Directory $IRPath\n\n# 시스템 정보\nsysteminfo > \"$IRPath\\systeminfo.txt\"\ndate /t >> \"$IRPath\\systeminfo.txt\"\ntime /t >> \"$IRPath\\systeminfo.txt\"\n\n# 프로세스·네트워크·계정\ntasklist /v /fo csv > \"$IRPath\\processes.csv\"\nnetstat -ano > \"$IRPath\\netstat.txt\"\nnet user > \"$IRPath\\users.txt\"\nnet localgroup administrators > \"$IRPath\\admins.txt\"\nipconfig /displaydns > \"$IRPath\\dns_cache.txt\"\nnet share > \"$IRPath\\shares.txt\"\nschtasks /query /fo CSV /v > \"$IRPath\\tasks.csv\"\nreg query HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run > \"$IRPath\\run_keys.txt\"\n\nWrite-Host \"수집 완료: $IRPath\"",
         output:`수집 완료: C:\IR_20240902_113000
   systeminfo.txt    (8 KB)
   processes.csv     (45 KB)
