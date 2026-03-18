@@ -378,15 +378,19 @@ const ARTIFACTS_DETAIL = [
   {
     id:"prefetch", icon:"⚡", name:"프리패치", subtitle:"Prefetch",
     color:"#ffd166", category:"실행흔적",
-    summary:"프로그램 로딩 속도 향상을 위해 Windows가 자동 생성하는 파일. 실행 파일 이름·실행 횟수·최근 8회 실행 시간·접근한 파일 목록을 담고 있어 삭제된 악성 파일의 실행도 증명 가능.",
+    summary:"Windows가 프로그램 로딩 속도를 높이기 위해 자동 생성하는 캐시 파일. 실행 파일명·경로·실행 횟수·최근 8회 실행 시간·접근한 파일/DLL 목록이 담긴다. 파일이 삭제된 후에도 .pf 파일이 남아 실행 사실을 법적으로 증명할 수 있는 강력한 아티팩트.",
     locations:[
-      { path:"C:\\Windows\\Prefetch\\", desc:"모든 .pf 파일 저장 위치" },
-      { path:"파일명 형식: <실행파일명>-<해시8자리>.pf", desc:"예: POWERSHELL.EXE-AB12CD34.pf" },
+      { path:"C:\\Windows\\Prefetch\\", desc:"모든 .pf 파일 저장 위치 (기본 최대 128개)" },
+      { path:"파일명: <실행파일명>-<해시8자리>.pf", desc:"해시는 실행 경로 기반 — 동일 파일명도 경로가 다르면 별도 .pf 생성. 예: POWERSHELL.EXE-AB12CD34.pf" },
+      { path:"C:\\Windows\\Prefetch\\Layout.ini", desc:"디스크 레이아웃 최적화 설정. 실행 프로그램 목록 힌트 포함" },
+      { path:"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\\PrefetchParameters", desc:"EnablePrefetcher 값: 0=비활성, 1=앱만, 2=부팅만, 3=전체활성(기본)" },
     ],
     tools:[
-      { name:"PECmd", desc:"Eric Zimmerman 도구. CSV/JSON 출력 지원. 가장 많이 사용", cmd:"PECmd.exe -d C:\\Windows\\Prefetch --csv output\\ --csvf prefetch.csv" },
-      { name:"WinPrefetchView", desc:"GUI 도구. 직관적이나 일괄 처리 불가" },
-      { name:"Autopsy", desc:"통합 포렌식 플랫폼 — Prefetch 자동 파싱" },
+      { name:"PECmd", desc:"Eric Zimmerman. 단일/폴더 전체 파싱. CSV·JSON·HTML 출력", cmd:"PECmd.exe -d C:\\Windows\\Prefetch --csv output\\ --csvf prefetch.csv --mp" },
+      { name:"PECmd (단일 파일)", desc:"특정 .pf 파일 상세 분석", cmd:"PECmd.exe -f \"C:\\Windows\\Prefetch\\MIMIKATZ.EXE-3B7D2F1A.pf\" --json output\\" },
+      { name:"WinPrefetchView", desc:"GUI 도구. 빠른 검토용", cmd:"(GUI 실행)" },
+      { name:"Autopsy", desc:"통합 포렌식 플랫폼 — Prefetch 자동 파싱 + 타임라인 통합" },
+      { name:"Velociraptor", desc:"원격 라이브 수집", cmd:"velociraptor artifacts collect Windows.Forensics.Prefetch" },
     ],
     keyItems:[
       {
@@ -447,11 +451,14 @@ Run 8: 2024-09-07 00:00:01 UTC`,
       },
     ],
     tips:[
-      "Windows Server는 기본적으로 Prefetch 비활성화 → EnablePrefetcher=3으로 활성화 여부 레지스트리 확인",
-      "SSD 환경에서도 PF 파일은 생성됨 (ReadyBoost 정책과 무관)",
-      "같은 파일명이라도 경로가 다르면 해시값이 다른 별도 PF 파일 생성",
-      "PECmd -d 옵션으로 폴더 전체 일괄 파싱 → CSV 출력 후 Excel 필터 활용",
-      "악성코드가 PF 파일을 삭제해도 $UsnJrnl에 삭제 이벤트 기록 남음",
+      "Windows Server는 기본 Prefetch 비활성화 → HKLM\\...\\PrefetchParameters\\EnablePrefetcher 값으로 활성화 여부 확인",
+      "SSD 환경에서도 .pf 파일은 생성됨 (TRIM과 무관)",
+      "동일 파일명이라도 실행 경로가 다르면 해시가 달라 별도 .pf 파일 생성됨 — 공격자가 정상 경로에 악성 파일을 놓아도 경로가 기록됨",
+      "PECmd --mp 옵션: 접근 파일 목록에서 알려진 악성코드 연관 파일명 자동 하이라이트",
+      "악성코드가 .pf 파일 삭제 시도해도 $UsnJrnl에 FileDelete 이벤트 남음",
+      "Windows 10 이후 MAM 압축 포맷(.pf 내부 압축) → PECmd가 자동 처리, 수동 열람 시 압축 해제 필요",
+      "128개 상한 도달 시 가장 오래된 .pf 삭제 → 오래 전 실행된 악성코드 증거 손실 가능",
+      "PECmd --csv 출력 후 'RunCount' 컬럼 정렬: 1회=최초실행후삭제, 수백회=지속적 재실행",
     ],
   },
   {
@@ -694,260 +701,521 @@ MFTECmd.exe -f $J --csv output\\                   (오프라인 이미지)`,
       "Velociraptor로 라이브 시스템 $MFT + $J 원격 수집 가능 — 이미지 불필요",
     ],
   },
-  {
+    {
     id:"lnk", icon:"🔗", name:"LNK / 점프리스트", subtitle:"Shortcut & JumpList",
     color:"#ffa657", category:"사용자행위",
-    summary:"사용자가 파일을 열 때 Windows가 자동 생성하는 바로가기 파일. 원본 파일이 삭제되어도 경로·접근 시간·MAC 주소·볼륨 시리얼이 LNK에 남아 파일 접근 사실을 증명한다.",
+    summary:"사용자가 파일을 열 때 Windows가 자동 생성하는 바로가기(.lnk) 파일과 앱별 최근 파일 목록(JumpList). 원본 파일이 삭제된 후에도 경로·접근 시간·MAC 주소·볼륨 시리얼·원본 PC명이 LNK에 남아 파일 접근 사실을 법적으로 증명할 수 있다.",
     locations:[
-      { path:"C:\\Users\\<user>\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\*.lnk", desc:"최근 파일 LNK 모음" },
-      { path:"C:\\Users\\<user>\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\AutomaticDestinations\\*.automaticDestinations-ms", desc:"자동 점프리스트 (앱별 최근 파일)" },
-      { path:"C:\\Users\\<user>\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\CustomDestinations\\*.customDestinations-ms", desc:"사용자 고정 점프리스트" },
-      { path:"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\ (공용 바로가기)", desc:"시스템 전체 바로가기" },
+      { path:"C:\\Users\\<user>\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\*.lnk", desc:"파일 탐색기·Office 등으로 연 파일의 LNK. 최대 최근 수백 개 보관" },
+      { path:"C:\\Users\\<user>\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\AutomaticDestinations\\*.automaticDestinations-ms", desc:"자동 점프리스트 — 앱별 최근 파일 목록 (AppId로 앱 식별)" },
+      { path:"C:\\Users\\<user>\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\CustomDestinations\\*.customDestinations-ms", desc:"사용자가 직접 고정한 항목 점프리스트" },
+      { path:"C:\\Users\\<user>\\AppData\\Roaming\\Microsoft\\Office\\Recent\\*.lnk", desc:"Office 최근 문서 LNK (Office 앱 별도 보관)" },
+      { path:"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\*.lnk", desc:"시작 메뉴 바로가기 — 설치된 프로그램 LNK" },
+      { path:"C:\\Users\\<user>\\Desktop\\*.lnk", desc:"바탕화면 바로가기" },
     ],
     tools:[
-      { name:"LECmd", desc:"Eric Zimmerman LNK 파서", cmd:"LECmd.exe -d \"C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Recent\" --csv output\\ --csvf lnk.csv" },
+      { name:"LECmd", desc:"Eric Zimmerman LNK 파서. 단일/.lnk 폴더 전체 파싱. CSV 출력", cmd:"LECmd.exe -d \"C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Recent\" --csv output\\ --csvf lnk.csv" },
+      { name:"LECmd (단일)", desc:"특정 LNK 상세 분석", cmd:"LECmd.exe -f \"C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\malware.lnk\"" },
       { name:"JLECmd", desc:"Eric Zimmerman 점프리스트 파서", cmd:"JLECmd.exe -d \"C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Recent\" --csv output\\ --csvf jumplist.csv" },
+      { name:"Autopsy", desc:"LNK·점프리스트 자동 파싱 + 타임라인 통합" },
     ],
     keyItems:[
       {
-        name:"LNK 핵심 메타데이터", threat:false,
-        desc:"LNK 파일 하나에 원본 파일에 대한 방대한 정보가 저장된다.",
-        parse_output:`Source Name: 방산청_협력사_공문_2024.docx.lnk
-Source Created:    2024-09-02 09:14:33   ← LNK 생성 = 파일 최초 접근 시간
-Source Modified:   2024-09-02 09:14:33
-Source Accessed:   2024-09-02 09:31:20
+        name:"LNK 핵심 메타데이터 전체", threat:false,
+        desc:"LNK 파일 하나에 원본 파일·드라이브·네트워크·생성 PC에 대한 방대한 정보가 저장된다.",
+        parse_output:`[LECmd CSV 주요 컬럼 — 방산청_협력사_공문_2024.docx.lnk]
+Source Name:          방산청_협력사_공문_2024.docx.lnk
+Source Created:       2024-09-02 09:14:33   ← LNK 생성 = 파일 최초 접근 시간
+Source Modified:      2024-09-02 09:14:33
+Source Accessed:      2024-09-02 09:31:20
 
-[링크 대상 정보]
-Target Full Path:  C:\\Users\\victim\\Downloads\\방산청_협력사_공문_2024.docx
-Target Created:    2024-09-02 09:13:45
-Target Modified:   2024-09-02 09:13:45
-Target File Size:  245760 bytes (240 KB)
+[링크 대상 — 내장 드라이브]
+Target Full Path:     C:\\Users\\victim\\Downloads\\방산청_협력사_공문_2024.docx
+Target Created:       2024-09-02 09:13:45
+Target Modified:      2024-09-02 09:13:45
+Target Accessed:      2024-09-02 09:14:30
+Target File Size:     245760 bytes
 
 [볼륨 정보]
-Drive Type:        Fixed (내장 드라이브)
-Volume Serial:     0xA1B2C3D4
-Volume Label:      Windows
+Drive Type:           Fixed  (0=Unknown, 1=NoRoot, 2=Removable/USB, 3=Fixed, 4=Network, 5=CD, 6=RAMDisk)
+Volume Serial:        0xA1B2C3D4
+Volume Label:         Windows
 
-[네트워크 공유 정보 — USB/네트워크인 경우]
-Network Share Path: \\\\192.168.10.20\\C$\\Tools\\malware.exe  ← 네트워크 접근 경로!
-Network Share Name: C$
+[USB/외장 드라이브인 경우]
+Drive Type:           Removable   ← USB
+Volume Serial:        0xE5F6A7B8  ← USBSTOR 레지스트리의 시리얼과 교차 확인!
+Target Full Path:     E:\\SecretDocs\\기밀_설계도면.dwg
 
-[호스트 정보]
-Machine ID (MAC):  00-1A-2B-3C-4D-5E   ← 생성 당시 네트워크 어댑터 MAC
-NetBIOS Name:      ATTACKER-PC          ← 원본 컴퓨터명`,
+[네트워크 공유인 경우]
+Drive Type:           Network
+Network Share Path:   \\\\192.168.10.20\\C$\\Tools\\malware.exe  ← 측면이동 직접 증거!
+Network Share Name:   C$
+
+[생성 PC 정보]
+Machine ID (MAC):     00-1A-2B-3C-4D-5E   ← LNK 생성 당시 NIC MAC 주소
+NetBIOS Name:         ATTACKER-PC-007      ← 원본 컴퓨터명`,
         interpretation:[
-          { field:"Source Created = LNK 생성 시간", meaning:"원본 파일을 처음 연 시간. 파일 탐색기, Office 등으로 파일을 열면 LNK 자동 생성. 정확한 최초 접근 시점" },
-          { field:"Target Full Path", meaning:"원본 파일의 전체 경로. 파일이 삭제되어도 경로 정보가 여기에 남음. 악성 파일의 위치 특정 가능" },
-          { field:"Network Share Path", meaning:"네트워크 공유로 파일 접근 시 \\\\서버IP\\공유명\\파일명 형태로 기록. 측면 이동 경로 직접 증명" },
-          { field:"Machine ID (MAC 주소)", meaning:"LNK 파일 생성 당시 PC의 네트워크 어댑터 MAC. 다른 PC에서 만들어진 LNK라면 원본 PC 식별 가능" },
-          { field:"NetBIOS Name", meaning:"LNK를 생성한 컴퓨터 이름. 내부 이동 경로 추적, 원본 PC 특정에 활용" },
-          { field:"Volume Serial", meaning:"드라이브 고유 식별자. MountedDevices, USBSTOR 레지스트리와 교차하면 드라이브 특정 가능" },
+          { field:"Source Created (LNK 생성 시간)", meaning:"파일을 처음 열었을 때 자동 생성. = 파일 최초 접근 시점. 파일 삭제 후에도 이 시간이 남음" },
+          { field:"Drive Type=Removable (2)", meaning:"USB 또는 외장드라이브에서 파일 열람. Volume Serial로 USBSTOR 레지스트리와 교차 → 특정 USB 기기 확정" },
+          { field:"Drive Type=Network (4)", meaning:"네트워크 공유에서 파일 열람. Network Share Path에 내부 서버 IP 포함 → 측면 이동 경로 직접 증명" },
+          { field:"Volume Serial", meaning:"드라이브 고유 시리얼. MountedDevices 레지스트리 + USBSTOR와 3중 교차로 동일 기기 확정" },
+          { field:"Machine ID (MAC 주소)", meaning:"LNK 생성 당시 NIC의 MAC. 다른 PC에서 가져온 LNK라면 원본 PC의 MAC → 원본 컴퓨터 특정 가능" },
+          { field:"NetBIOS Name", meaning:"LNK를 생성한 컴퓨터의 네트워크 이름. 내부 자산목록과 대조하면 원본 PC 특정" },
+          { field:"Target File Size vs MFT", meaning:"LNK에 기록된 크기와 MFT 파일 크기 비교. 불일치 시 파일이 수정되거나 교체된 것" },
         ],
-        forensic:"LNK의 Network Share Path에 내부 서버 IP가 있으면 측면 이동의 직접 증거. MAC 주소로 원본 PC 특정.",
-        ioc:"Network Share Path에 \\\\내부IP\\ADMIN$ 또는 \\\\내부IP\\C$ 포함, 다른 PC의 MAC 주소",
+        forensic:"Drive Type=Network + Network Share Path = 측면 이동 확정. Drive Type=Removable + Volume Serial = USB 반출 확정.",
+        ioc:"Drive Type=Removable, Network Share Path \\\\내부IP\\C$, 다른 컴퓨터의 MAC/NetBIOS Name",
       },
       {
-        name:"점프리스트 (JumpList)", threat:false,
-        desc:"앱별로 최근 사용한 파일 목록을 저장. LNK보다 더 많은 파일 접근 이력을 보관.",
-        parse_output:`[자동 점프리스트: Microsoft Word]
-AppId: d3b233c31b22c7ac
-Entry Count: 18
+        name:"점프리스트 (AutomaticDestinations)", threat:false,
+        desc:"앱별 최근 파일 목록. LNK보다 더 많은 이력을 보관. AppId로 어떤 앱으로 파일을 열었는지 특정 가능.",
+        parse_output:`[JLECmd CSV — Microsoft Word AutomaticDestinations]
+AppId:              d3b233c31b22c7ac  (= Microsoft Word)
+AppIdDescription:   Microsoft Word 2016
+Source Created:     2024-08-01 09:00:00
+Source Modified:    2024-09-05 16:45:00
 
-순서  파일명                                    접근시간              크기
--------------------------------------------------------------------------------------
-0     방산청_협력사_공문_2024.docx               2024-09-02 09:14      245760
-1     기술연구_기밀_Rev3.docx                    2024-09-03 14:30      1052160   ← 기밀 문서!
-2     직원_급여_명세.xlsx                        2024-09-04 11:20      87040
-3     system_admin_credentials.txt              2024-09-04 16:45      1024      ← 자격증명 파일!
-4     VPN_config_backup.conf                    2024-09-05 09:00      4096      ← VPN 설정!`,
+Entry#  TargetPath                                           Created               Modified              Accessed              FileSize
+--------------------------------------------------------------------------------------------------------------------------------------
+0       C:\\Users\\victim\\Downloads\\방산청_공문_2024.docx      2024-09-02 09:13:45   2024-09-02 09:13:45   2024-09-02 09:14:30   245760
+1       D:\\Research\\기밀_설계도면_Rev5.dwg                    2024-09-03 14:00:00   2024-09-04 09:30:00   2024-09-04 09:30:00   10485760  ← 기밀!
+2       C:\\Users\\victim\\Documents\\직원_급여_DB.xlsx           2024-09-04 11:00:00   2024-09-04 11:20:00   2024-09-04 11:20:00   87040
+3       \\\\192.168.10.20\\Research\\핵심기술_최종.docx          2024-09-05 10:00:00   2024-09-05 14:00:00   2024-09-05 14:00:00   524288    ← 네트워크 공유!
+4       E:\\backup\\credentials_backup.txt                      2024-09-05 22:00:00   2024-09-05 22:05:00   2024-09-05 22:05:00   1024      ← USB+자격증명!
+
+[주요 AppId 목록]
+d3b233c31b22c7ac = Microsoft Word
+5d696d521de238c3 = Microsoft Excel
+b8ab77100df80ab3 = Windows Explorer
+9b9cdc69c08f26b8 = Notepad
+a7bd71699cd38d1c = Adobe Acrobat Reader`,
         interpretation:[
-          { field:"AppId", meaning:"앱별 고유 ID. Word, Excel, Explorer, Chrome 등 앱이 특정됨. 어떤 앱으로 파일을 열었는지 파악" },
-          { field:"Entry Count", meaning:"저장된 파일 접근 이력 개수. LNK보다 더 많은 이력을 보관하는 경우가 많음" },
-          { field:"파일명 목록", meaning:"공격자가 열람한 파일 목록. 기밀 문서, 자격증명 파일, 설정 파일에 대한 접근 직접 증명" },
-          { field:"접근 시간 순서", meaning:"파일 열람 순서와 시간으로 공격자의 행동 흐름 재구성 가능" },
+          { field:"AppId / AppIdDescription", meaning:"파일을 열 때 사용한 앱 특정. Explorer AppId는 탐색기로 탐색한 폴더도 포함" },
+          { field:"Entry# 순서", meaning:"가장 최근 열람 순서. 0이 최근. 공격자의 파일 접근 순서와 흐름 파악" },
+          { field:"네트워크 경로 (\\\\IP\\...)", meaning:"다른 서버의 파일을 Word로 직접 열람 → 측면 이동 + 파일 접근 동시 증명" },
+          { field:"USB 경로 (E:\\...) + 자격증명 파일명", meaning:"USB로 자격증명 파일 반출 직접 증거. LNK Volume Serial과 교차하면 특정 USB 확정" },
+          { field:"Source Modified 시간", meaning:"점프리스트 파일 자체가 마지막으로 수정된 시간 = 마지막 파일 접근 시간" },
         ],
-        forensic:"credentials, password, vpn, config, backup 등 키워드가 포함된 파일명이 있으면 내부 정찰 직접 증거.",
-        ioc:"자격증명 파일(.txt, .xlsx), VPN 설정 파일, 기밀 문서에 대한 접근 이력",
+        forensic:"점프리스트는 LNK보다 더 오래된 이력 보관. credentials, password, 기밀, backup 키워드 파일명 우선 검토.",
+        ioc:"자격증명 파일(.txt .xlsx), VPN·SSH 설정 파일, 기밀 문서, 네트워크 공유 경로 파일 접근",
+      },
+      {
+        name:"LNK 타임스탬프 비교 분석", threat:true,
+        desc:"LNK에는 LNK 파일 자체의 타임스탬프와 원본 파일의 타임스탬프가 모두 기록된다. 이 둘의 관계로 파일 조작 여부를 탐지할 수 있다.",
+        parse_output:`[LNK 타임스탬프 정합성 분석]
+
+케이스 1: 정상 패턴
+Source Created:       2024-09-02 09:14:33  (LNK 생성 = 파일 최초 열람)
+Target Created:       2024-09-02 09:13:45  (원본 파일 생성)
+Target Modified:      2024-09-02 09:13:45
+→ Target Created < Source Created 정상 (파일 생성 후 열람)
+
+케이스 2: Timestomping 탐지
+Source Created:       2024-09-02 09:14:33  (LNK 생성 — 변조 불가)
+Target Created:       2019-01-15 08:00:00  (원본 파일 $SI 시간 — 변조됨!)
+→ LNK Source Created 2024년, Target Created 2019년 = Timestomping 확정!
+→ 실제 드롭 시간: 2024-09-02 09:13~09:14 (LNK 기준)
+
+케이스 3: USB 반출 후 LNK 남음
+Source Created:       2024-09-05 22:05:33
+Drive Type:           Removable
+Target Full Path:     E:\\backup\\design_final.dwg
+→ 원본 파일 없지만 LNK로 USB에서 파일 열었음 증명`,
+        interpretation:[
+          { field:"LNK Source Created vs MFT Created 비교", meaning:"LNK 생성 시간은 변조하기 어려움. MFT $SI가 Timestomped 됐어도 LNK로 실제 접근 시간 파악 가능" },
+          { field:"Target Created 시간이 비현실적으로 오래됨", meaning:"Timestomping 의심. LNK Source Created가 실제 드롭 시간에 가까움" },
+          { field:"Drive Type=Removable + 원본 없음", meaning:"USB는 이미 제거됐지만 LNK로 접근 사실 증명 가능. Volume Serial로 USB 특정" },
+        ],
+        forensic:"LNK Source Created는 Timestomping에 면역. MFT $SI와 LNK를 교차하면 변조된 타임스탬프 탐지 가능.",
+        ioc:"LNK Source Created와 Target Created(MFT $SI) 수년 차이, Removable 드라이브 LNK만 남고 원본 없음",
       },
     ],
     tips:[
-      "LNK 파일은 원본 삭제 후에도 30일간 유지 (Windows 기본 정책)",
-      "공격자가 Recent 폴더를 삭제해도 $UsnJrnl에 LNK 생성·삭제 이벤트 남음",
-      "LECmd --all 옵션으로 숨겨진 LNK 속성까지 모두 추출",
-      "JumpList의 AppId 목록: WORD=d3b233c31b22c7ac, EXCEL=5d696d521de238c3, EXPLORER=b8ab77100df80ab3",
-      "점프리스트는 LNK보다 더 오래된 파일 접근 이력을 보관하는 경우가 많음",
+      "LNK 파일은 원본 삭제 후에도 최대 30일 유지 (Windows 기본 정책). Recent 폴더 직접 확인",
+      "공격자가 Recent 폴더 삭제 시도 → $UsnJrnl에 .lnk FileDelete 이벤트 남음 (삭제 사실 자체가 증거)",
+      "LECmd --all 옵션으로 숨겨진 LNK 속성 모두 추출. 기본 출력에 없는 Extra Data 섹션도 포함",
+      "Drive Type 숫자: 2=Removable(USB), 3=Fixed(HDD/SSD), 4=Network(공유), 6=RAM — 반드시 확인",
+      "AppId 매핑 테이블: WORD=d3b233c31b22c7ac, EXCEL=5d696d521de238c3, EXPLORER=b8ab77100df80ab3",
+      "JumpList Entry#0이 가장 최근. 파일 접근 순서대로 정렬되어 공격자 행동 흐름 재구성 가능",
+      "점프리스트는 LNK보다 더 오래된 이력 보관 → LNK가 삭제됐어도 JumpList에 남아있는 경우 있음",
     ],
   },
   {
     id:"shellbag", icon:"🗂", name:"쉘백", subtitle:"Shellbag",
     color:"#ff9f43", category:"사용자행위",
-    summary:"파일 탐색기로 폴더를 열 때 Windows가 창 크기·위치·정렬 방식을 저장하는 레지스트리 키. 사용자가 방문한 모든 폴더 경로와 접근 시간이 기록되며, 폴더가 삭제된 후에도 흔적이 남는다.",
+    summary:"파일 탐색기로 폴더를 열 때 Windows가 창 크기·위치·정렬 방식을 저장하는 레지스트리 키. 폴더 열람 이력과 접근 시간이 기록되며, 폴더가 삭제된 후에도 흔적이 남는다. 공격자의 내부 정찰 경로, USB 탐색, 네트워크 공유 접근을 추적하는 핵심 아티팩트.",
     locations:[
-      { path:"NTUSER.DAT: Software\\Microsoft\\Windows\\Shell\\BagMRU", desc:"탐색기 폴더 탐색 이력 (기본 폴더)" },
-      { path:"NTUSER.DAT: Software\\Microsoft\\Windows\\Shell\\Bags", desc:"각 폴더의 창 설정 저장" },
-      { path:"UsrClass.dat: Local Settings\\Software\\Microsoft\\Windows\\Shell\\BagMRU", desc:"더 상세한 탐색 이력. ZIP·폴더 내부 포함 (핵심!)" },
-      { path:"UsrClass.dat: Local Settings\\Software\\Microsoft\\Windows\\Shell\\Bags", desc:"창 설정 (UsrClass)" },
+      { path:"NTUSER.DAT: Software\\Microsoft\\Windows\\Shell\\BagMRU", desc:"기본 폴더 탐색 이력. 사용자 세션마다 갱신" },
+      { path:"NTUSER.DAT: Software\\Microsoft\\Windows\\Shell\\Bags", desc:"각 폴더의 창 설정 (크기·위치·정렬·아이콘 배치)" },
+      { path:"UsrClass.dat: Local Settings\\Software\\Microsoft\\Windows\\Shell\\BagMRU", desc:"더 상세한 탐색 이력. ZIP 내부·폴더 세부 항목 포함 (핵심 분석 대상!)" },
+      { path:"UsrClass.dat: Local Settings\\Software\\Microsoft\\Windows\\Shell\\Bags", desc:"창 설정 (UsrClass 버전)" },
+      { path:"파일 위치: C:\\Users\\<user>\\NTUSER.DAT", desc:"사용자 홈 디렉토리" },
+      { path:"파일 위치: C:\\Users\\<user>\\AppData\\Local\\Microsoft\\Windows\\UsrClass.dat", desc:"UsrClass 파일 위치" },
     ],
     tools:[
-      { name:"ShellBagsExplorer", desc:"Eric Zimmerman GUI 도구. 폴더 트리 시각화", cmd:"ShellBagsExplorer.exe (GUI)" },
-      { name:"SBECmd", desc:"명령줄 쉘백 파서. CSV 출력", cmd:"SBECmd.exe -d \"C:\\Users\" --csv output\\ --csvf shellbag.csv" },
+      { name:"ShellBagsExplorer (SBE)", desc:"Eric Zimmerman GUI 도구. 폴더 트리 시각화. 직관적인 타임라인 뷰 제공", cmd:"ShellBagsExplorer.exe (GUI — NTUSER.DAT 또는 UsrClass.dat 로드)" },
+      { name:"SBECmd", desc:"Eric Zimmerman 명령줄 파서. CSV 출력. 자동화·일괄 처리 가능", cmd:"SBECmd.exe -d \"C:\\Users\" --csv output\\ --csvf shellbag.csv" },
+      { name:"SBECmd (단일 파일)", desc:"특정 하이브 파일 분석", cmd:"SBECmd.exe -f \"C:\\Users\\victim\\UsrClass.dat\" --csv output\\ --csvf sb.csv" },
+      { name:"Registry Explorer", desc:"레지스트리 탐색기로 BagMRU 키 직접 열람" },
     ],
     keyItems:[
       {
-        name:"폴더 탐색 이력", threat:false,
-        desc:"탐색기로 열어본 모든 폴더의 경로와 접근 시간. 삭제된 폴더, 외부 드라이브, 네트워크 공유 경로까지 기록.",
-        parse_output:`AbsolutePath                                          FirstInteracted          LastInteracted           MRUOrder
-------------------------------------------------------------------------------------------------------------------------------
-C:\\                                                    2023-01-15 09:00         2024-09-15 03:10         0
-C:\\Staging                                             2024-09-03 14:22         2024-09-10 22:28         1  ← 스테이징 폴더!
-C:\\Staging\\Research                                   2024-09-03 14:25         2024-09-10 22:25         2
-C:\\Windows\\Temp                                       2024-09-02 09:35         2024-09-15 03:12         3  ← 악성 파일 확인
-C:\\ProgramData\\MicrosoftUpdate                        2024-09-02 09:33         2024-09-02 09:33         4  ← 악성 폴더
-E:\\SecretDocs (이동식 드라이브)                          2024-09-05 22:10         2024-09-05 22:30         5  ← USB!
-\\\\192.168.10.20\\C$\\Tools                             2024-09-02 11:15         2024-09-07 03:00         6  ← 측면이동!`,
+        name:"폴더 탐색 이력 — 전체 경로 & 시간", threat:false,
+        desc:"탐색기로 클릭하여 들어간 모든 폴더. 삭제된 폴더·USB·네트워크 공유 경로까지 기록.",
+        parse_output:`[SBECmd CSV 출력 — 주요 컬럼]
+AbsolutePath                                          FirstInteracted          LastInteracted           MRUOrder  SlotModified
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+C:\\                                                    2023-01-15 09:00:00      2024-09-15 03:10:00      0         2024-09-15 03:10
+C:\\Staging                                             2024-09-03 14:22:01      2024-09-10 22:28:00      1         2024-09-10 22:28  ← 스테이징 폴더!
+C:\\Staging\\Research                                   2024-09-03 14:25:44      2024-09-10 22:25:33      2         2024-09-10 22:25
+C:\\Staging\\Credentials                                2024-09-04 11:20:00      2024-09-05 09:00:00      3         2024-09-05 09:00  ← 자격증명 폴더!
+C:\\Windows\\Temp                                       2024-09-02 09:35:00      2024-09-15 03:12:00      4         2024-09-15 03:12  ← 악성파일 확인
+C:\\ProgramData\\MicrosoftUpdate                        2024-09-02 09:33:00      2024-09-02 09:33:00      5         2024-09-02 09:33
+D:\\Research                                            2024-09-03 14:00:00      2024-09-10 22:00:00      6         2024-09-10 22:00  ← 연구자료!
+D:\\Research\\핵심기술_2024                             2024-09-03 14:05:00      2024-09-10 21:55:00      7         2024-09-10 21:55
+E:\\ (이동식 드라이브)                                   2024-09-05 22:08:00      2024-09-05 22:30:00      8         2024-09-05 22:30  ← USB!
+E:\\backup                                              2024-09-05 22:10:00      2024-09-05 22:25:00      9         2024-09-05 22:25
+\\\\192.168.10.20\\C$                                   2024-09-02 11:15:00      2024-09-07 03:00:00      10        2024-09-07 03:00  ← 측면이동!
+\\\\192.168.10.20\\C$\\Tools                             2024-09-02 11:15:30      2024-09-07 03:05:00      11        2024-09-07 03:05`,
         interpretation:[
-          { field:"AbsolutePath (절대 경로)", meaning:"탐색기로 접근한 폴더의 전체 경로. 폴더가 삭제되어도 경로가 여기에 남아 존재했음을 증명" },
-          { field:"FirstInteracted", meaning:"해당 폴더를 처음 열어본 시간. 스테이징 폴더 최초 생성 시점과 연계 분석 가능" },
-          { field:"LastInteracted", meaning:"마지막으로 접근한 시간. 공격 종료 시점 추정에 활용" },
-          { field:"이동식 드라이브 경로 (E:\\...)", meaning:"USB 또는 외장 하드에서 탐색한 폴더. LNK·USBSTOR 레지스트리와 교차하면 USB 접근 확정" },
-          { field:"네트워크 경로 (\\\\IP\\...)", meaning:"내부 서버 공유 폴더 접근. 측면 이동 경로와 정찰 범위 직접 파악 가능" },
-          { field:"비정상 폴더 (C:\\Staging, ProgramData\\...)", meaning:"정상 사용에서 나타나지 않는 경로. 공격자가 생성한 수집·스테이징 폴더 접근 증거" },
+          { field:"AbsolutePath (절대 경로)", meaning:"탐색기로 클릭하여 진입한 폴더 경로. 폴더 삭제 후에도 여기에 경로가 남아 존재했음을 증명" },
+          { field:"FirstInteracted", meaning:"해당 폴더를 처음 탐색기로 열어본 시간. 스테이징 폴더 최초 생성/접근 시점과 연계 분석" },
+          { field:"LastInteracted", meaning:"마지막으로 탐색기로 접근한 시간. 공격 활동 종료 시점 추정" },
+          { field:"SlotModified", meaning:"해당 쉘백 슬롯(레지스트리 키)이 마지막으로 수정된 시간. LastInteracted와 같거나 가까움" },
+          { field:"MRUOrder (최근 접근 순서)", meaning:"0이 가장 최근. 공격자가 마지막으로 접근한 폴더부터 역순으로 정렬" },
+          { field:"C:\\Staging\\ 경로", meaning:"정상 사용에서 절대 나타나지 않는 경로. 데이터 수집 스테이징 폴더 생성·접근 직접 증거" },
+          { field:"E:\\ (이동식)", meaning:"USB 드라이브 탐색. LNK Volume Serial + USBSTOR 레지스트리와 교차하면 특정 USB 확정" },
+          { field:"\\\\192.168.10.20\\C$ (네트워크)", meaning:"내부 서버 C$ 관리 공유 직접 접근. 측면 이동 + 파일 정찰 확정. IP로 피해 서버 특정" },
         ],
-        forensic:"\\\\내부IP\\공유 경로 존재 시 측면 이동 확정. C:\\Staging 같은 비정상 폴더는 데이터 수집 증거.",
-        ioc:"C:\\Staging\\ 또는 유사 수집 폴더, \\\\내부IP\\ADMIN$, 이동식 드라이브 경로",
+        forensic:"네트워크 경로 + 스테이징 폴더 조합은 APT의 전형적 패턴. C:\\Staging + D:\\Research + \\\\내부IP 3종이 모두 있으면 침해 확정 수준.",
+        ioc:"C:\\Staging 또는 C:\\Collect 등 비정상 수집 폴더, \\\\내부IP\\ADMIN$ 또는 \\\\내부IP\\C$, E:\\ 이동식 접근",
+      },
+      {
+        name:"ZIP·압축 파일 내부 탐색 이력", threat:true,
+        desc:"ZIP 파일을 탐색기로 열어 내부를 탐색한 경우도 쉘백에 기록됨. 악성 페이로드 압축 파일 내부 탐색 흔적 탐지.",
+        parse_output:`[UsrClass.dat 쉘백 — ZIP 내부 탐색]
+AbsolutePath
+--------------------------------------------------------------
+C:\\Users\\victim\\Downloads\\tools.zip
+C:\\Users\\victim\\Downloads\\tools.zip\\mimikatz_x64
+C:\\Users\\victim\\Downloads\\tools.zip\\mimikatz_x64\\x64
+C:\\Users\\victim\\Downloads\\tools.zip\\procdump
+
+FirstInteracted: 2024-09-02 10:40:00
+LastInteracted:  2024-09-02 10:42:00
+
+[참고: NTUSER.DAT vs UsrClass.dat]
+NTUSER.DAT:   상위 폴더 접근만 기록 (C:\\Users\\victim\\Downloads\\)
+UsrClass.dat: ZIP 내부 경로까지 상세 기록 → 반드시 둘 다 분석!`,
+        interpretation:[
+          { field:"ZIP 내부 경로", meaning:"압축 파일을 탐색기로 열어 내부를 탐색한 흔적. 공격자가 어떤 공격 도구가 들어있는지 확인한 것" },
+          { field:"UsrClass.dat에만 존재", meaning:"NTUSER.DAT에는 ZIP 파일 경로까지만, UsrClass.dat에는 ZIP 내부 폴더 구조까지 상세히 기록됨" },
+          { field:"접근 시간 + 파일명", meaning:"mimikatz, procdump, meterpreter 등 공격 도구명이 경로에 포함되면 직접 증거" },
+        ],
+        forensic:"UsrClass.dat 쉘백의 ZIP 내부 경로에 공격 도구명이 있으면 도구 탐색 확정 증거.",
+        ioc:"ZIP 내부 경로에 mimikatz, procdump, cobalt, meterpreter 등 공격 도구명 포함",
+      },
+      {
+        name:"쉘백과 이벤트 로그 교차 분석", threat:true,
+        desc:"쉘백의 폴더 접근 시간을 이벤트 로그·MFT와 교차하면 공격자 행동을 더 정밀하게 재구성할 수 있다.",
+        parse_output:`[교차 분석 예시 — 시간 흐름]
+
+09:33  쉘백: C:\\ProgramData\\MicrosoftUpdate 첫 탐색
+       → MFT: 같은 시간 svcupd.exe FileCreate
+       → 레지스트리 Run키: 같은 시간 WindowsUpdate 등록
+       = 악성 파일 드롭 → 폴더 확인 → 지속성 등록 순서 확인
+
+11:15  쉘백: \\\\192.168.10.20\\C$ 첫 탐색
+       → 이벤트 4624 Type10: 같은 시간 192.168.10.20 RDP 로그온
+       → RDP MRU 레지스트리: 192.168.10.20 기록
+       = 측면 이동 후 즉시 타겟 서버 공유 탐색
+
+14:22  쉘백: C:\\Users\\victim 재탐색
+       → MFT: .locked 파일 대량 생성 시작
+       = 랜섬웨어 암호화 직전 파일 시스템 확인`,
+        interpretation:[
+          { field:"쉘백 + MFT 교차", meaning:"특정 폴더 접근 시간과 해당 폴더에서의 파일 생성/삭제 이벤트 비교 → 행위 순서 확정" },
+          { field:"쉘백 + 이벤트 로그 교차", meaning:"폴더 탐색과 로그온 이벤트 시간 매핑 → 원격 접속 직후 파일 시스템 정찰 패턴 확인" },
+          { field:"쉘백 + 레지스트리 교차", meaning:"폴더 탐색 직후 해당 폴더 경로에서 Run키 등록 → 파일 드롭 후 즉시 지속성 확보 순서 증명" },
+        ],
+        forensic:"쉘백 단독으로는 폴더 열람만 증명. 다른 아티팩트와 교차하면 공격자의 의도와 행동 흐름까지 증명 가능.",
+        ioc:"측면 이동 직후 타겟 서버 공유 탐색 패턴, 악성 파일 드롭 직후 해당 폴더 탐색",
       },
     ],
     tips:[
-      "UsrClass.dat의 쉘백이 NTUSER.DAT보다 훨씬 상세함 — 반드시 둘 다 분석",
-      "ZIP 파일 내부 폴더도 쉘백에 기록됨 → 압축 파일 탐색 이력 파악 가능",
-      "네트워크 경로(UNC)가 있으면 해당 IP의 이벤트 로그와 교차 분석",
-      "삭제된 폴더는 경로가 남지만 FirstInteracted 시간이 부정확할 수 있음",
-      "SBECmd --dt 옵션으로 로컬 시간 기준 출력 (타임존 자동 적용)",
+      "UsrClass.dat의 쉘백이 NTUSER.DAT보다 훨씬 상세 — 반드시 둘 다 분석. 특히 ZIP 내부 탐색은 UsrClass.dat에만 기록",
+      "SBECmd -d 옵션: Users 폴더 전체 스캔 → 모든 사용자 계정의 쉘백 일괄 수집",
+      "네트워크 경로(\\\\IP\\...)가 있으면 해당 IP의 이벤트 로그와 타임스탬프 교차 분석",
+      "삭제된 폴더는 경로가 남지만 FirstInteracted 시간이 부정확할 수 있음 → SlotModified 기준으로 보완",
+      "ShellBagsExplorer에서 경로별 타임라인 뷰로 공격자 이동 경로 시각화 가능",
+      "쉘백은 탐색기 클릭 이력만 기록 — cmd나 PowerShell로 폴더 접근 시 기록 안 됨 → Prefetch·이벤트 로그 병행",
+      "SBECmd --dt 옵션: 로컬 시간 기준 출력 (타임존 자동 변환 적용)",
     ],
   },
   {
     id:"browser", icon:"🌐", name:"브라우저 히스토리", subtitle:"Browser Artifacts",
     color:"#4ecdc4", category:"네트워크",
-    summary:"Chrome·Edge·Firefox 등의 방문 기록, 다운로드 이력, 검색어, 쿠키, 저장된 비밀번호가 SQLite DB로 저장된다. C2 서버 접속·피싱 사이트 방문·악성 파일 다운로드 경로 추적의 핵심.",
+    summary:"Chrome·Edge·Firefox 등의 방문 기록·다운로드·검색어·쿠키·저장 자격증명이 SQLite DB로 저장된다. C2 서버 접속·피싱 사이트 방문·악성 파일 다운로드 경로 추적의 핵심 증거. 삭제해도 SQLite freelist나 WAL 파일에 잔존 가능.",
     locations:[
-      { path:"C:\\Users\\<user>\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\History", desc:"Chrome 방문·다운로드 기록 (SQLite)" },
-      { path:"C:\\Users\\<user>\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", desc:"Edge 방문·다운로드 기록 (동일 구조)" },
-      { path:"C:\\Users\\<user>\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\<profile>\\places.sqlite", desc:"Firefox 방문 기록" },
-      { path:"C:\\Users\\<user>\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Login Data", desc:"저장된 자격증명 (암호화)" },
-      { path:"C:\\Users\\<user>\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies", desc:"쿠키 데이터" },
-      { path:"C:\\Users\\<user>\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cache\\", desc:"캐시 파일 (일부 복원 가능)" },
+      { path:"C:\\Users\\<user>\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\History", desc:"Chrome 방문·다운로드 기록 (SQLite — urls·visits·downloads 테이블)" },
+      { path:"C:\\Users\\<user>\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\History-wal", desc:"WAL(Write-Ahead Log) — 미커밋 최신 트랜잭션. History와 함께 수집 필수" },
+      { path:"C:\\Users\\<user>\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", desc:"Edge 방문·다운로드 기록 (Chrome과 동일한 SQLite 구조)" },
+      { path:"C:\\Users\\<user>\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\<id>\\places.sqlite", desc:"Firefox 방문·북마크 기록 (moz_places·moz_historyvisits 테이블)" },
+      { path:"C:\\Users\\<user>\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Login Data", desc:"저장된 자격증명 — DPAPI로 암호화. DPAPI 키 있으면 복호화 가능" },
+      { path:"C:\\Users\\<user>\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies", desc:"쿠키 데이터 — 세션 인증 쿠키 포함" },
+      { path:"C:\\Users\\<user>\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cache\\", desc:"페이지 캐시 파일 — Hindsight로 일부 복원 가능" },
+      { path:"C:\\Users\\<user>\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Web Data", desc:"자동완성 데이터 (폼 입력값·주소 등)" },
     ],
     tools:[
-      { name:"Hindsight", desc:"Chrome·Chromium 전용 포렌식 도구. 방문 기록·다운로드·쿠키·캐시 통합 분석", cmd:"hindsight.py -i \"Chrome\\User Data\\Default\" -o output\\" },
-      { name:"DB Browser for SQLite", desc:"SQLite DB 직접 열람. 테이블 구조 확인에 유용", cmd:"(GUI 도구)" },
-      { name:"BrowsingHistoryView", desc:"여러 브라우저 통합 히스토리 뷰어", cmd:"(GUI 도구)" },
+      { name:"Hindsight", desc:"Chrome·Chromium 전용 포렌식 도구. 방문·다운로드·쿠키·캐시·자동완성 통합 분석. HTML 리포트 생성", cmd:"hindsight.py -i \"Chrome\\User Data\\Default\" -o output\\ -t output.sqlite" },
+      { name:"DB Browser for SQLite", desc:"SQLite DB 직접 열람. 테이블 구조·SQL 쿼리 실행. 수동 분석에 필수", cmd:"(GUI — History 파일 직접 열기)" },
+      { name:"BrowsingHistoryView", desc:"Chrome·Edge·Firefox·IE 통합 히스토리 뷰어", cmd:"(GUI 실행)" },
+      { name:"SQLECmd", desc:"Eric Zimmerman. SQLite DB 일괄 파싱·CSV 출력", cmd:"SQLECmd.exe -f \"History\" --csv output\\ --csvf browser.csv" },
     ],
     keyItems:[
       {
-        name:"방문 기록 (urls·visits 테이블)", threat:true,
-        desc:"방문한 모든 URL과 방문 시간. C2 서버 도메인, 피싱 사이트, 악성 파일 호스팅 사이트 탐지.",
-        parse_output:`[urls 테이블 + visits 테이블 조인 결과]
-visit_time(UTC)       url                                                   title                    visit_count
---------------------------------------------------------------------------------------------------------------------
-2024-09-02 09:13:20   http://attacker-cdn[.]com/docs/공문.docx               문서 다운로드               1
-2024-09-02 09:13:22   http://attacker-cdn[.]com/docs/공문.docx               문서 다운로드               2  (리다이렉트)
-2024-09-02 09:35:01   https://update-ms-cdn[.]com/beacon                    (빈 페이지)                1  ← C2 비콘!
-2024-09-02 09:35:02   https://update-ms-cdn[.]com/beacon                    (빈 페이지)                2
-2024-09-10 22:00:00   https://wetransfer.com/uploads                        WeTransfer               1  ← 파일 업로드!
-2024-09-10 22:05:44   https://wetransfer.com/downloads/...                  다운로드 링크              1`,
+        name:"방문 기록 — urls + visits 테이블 조인", threat:true,
+        desc:"방문한 모든 URL과 방문 시간·횟수. C2 서버 도메인, 피싱 사이트, 악성 파일 호스팅 사이트 탐지.",
+        parse_output:`[DB Browser SQL 쿼리]
+SELECT datetime(v.visit_time/1000000-11644473600, 'unixepoch') AS visit_time_utc,
+       u.url, u.title, u.visit_count, v.from_visit, v.transition
+FROM visits v JOIN urls u ON v.url = u.id
+ORDER BY v.visit_time DESC;
+
+[결과]
+visit_time_utc        url                                              title                  visit_count  transition
+----------------------------------------------------------------------------------------------------------------------
+2024-09-02 09:13:20   http://attacker-cdn[.]com/docs/공문.docx          문서 다운로드             1            TYPED(1)   ← 직접 입력!
+2024-09-02 09:13:22   http://attacker-cdn[.]com/docs/공문.docx          문서 다운로드             2            LINK(2)    ← 리다이렉트
+2024-09-02 09:35:01   https://update-ms-cdn[.]com/beacon               (빈 페이지)              1            AUTO_TOPLEVEL ← C2 비콘
+2024-09-02 09:35:02   https://update-ms-cdn[.]com/beacon               (빈 페이지)              2
+2024-09-10 21:55:00   https://mega.nz/upload                           MEGA                   1            TYPED(1)   ← 파일 업로드!
+2024-09-10 22:05:44   https://mega.nz/file/...                         MEGA 다운로드 링크        1            LINK(2)`,
         interpretation:[
-          { field:"visit_time (WebKit 타임스탬프)", meaning:"1601-01-01 기준 마이크로초 단위. DB Browser나 Hindsight가 자동 변환. 수동 변환: (값 - 11644473600000000) / 1000000 → Unix timestamp" },
-          { field:"visit_count > 1", meaning:"같은 URL 여러 번 방문 또는 리다이렉트 체인. C2 비콘이 반복 전송될 때 나타남" },
-          { field:"C2 도메인 패턴", meaning:"update-, cdn-, cdn-delivery-, ms-update- 등 Microsoft 위장 도메인. IP 직접 접속(http://123.456.x.x) 패턴도 주목" },
-          { field:"파일 업로드 서비스 접속", meaning:"WeTransfer, Google Drive, Dropbox, Mega 등 클라우드 스토리지 → 데이터 유출 경로 의심" },
+          { field:"visit_time (WebKit 타임스탬프 변환)", meaning:"원본값은 1601-01-01 기준 마이크로초. SQL 변환: datetime(값/1000000-11644473600, 'unixepoch'). Hindsight가 자동 변환" },
+          { field:"transition=TYPED(1)", meaning:"사용자가 주소창에 직접 URL을 타이핑. 공격자가 명시적으로 알고 있는 URL. 가장 의심스러운 접근 방식" },
+          { field:"transition=LINK(2)", meaning:"링크 클릭 또는 리다이렉트. from_visit로 어디서 왔는지 역추적 가능" },
+          { field:"transition=AUTO_TOPLEVEL", meaning:"자동으로 열린 탑레벨 탐색. C2 비콘·악성 광고·자동 리다이렉트에서 나타남" },
+          { field:"visit_count", meaning:"해당 URL 방문 횟수. C2 비콘이 주기적으로 방문하면 높은 값. 단순 피싱 클릭이면 보통 1~2" },
+          { field:"파일 업로드 서비스", meaning:"MEGA, WeTransfer, Dropbox, Google Drive 등 접속 → 데이터 유출 경로. SRUM BytesSent와 시간 비교" },
         ],
-        forensic:"C2 도메인 방문 이력 + SRUM 네트워크 사용량 조합으로 통신 시간과 용량 모두 증명 가능.",
-        ioc:"Microsoft 위장 도메인, IP 직접 접속 URL, 파일 업로드 서비스 접속",
+        forensic:"transition=TYPED + 공격자 도메인 = 의도적 접근. C2 도메인 + 높은 visit_count = 자동 비콘 통신. 업로드 서비스 + SRUM 대용량 송신 = 유출 확정.",
+        ioc:"Microsoft 위장 도메인(update-, cdn-, ms-), IP 직접 접속 URL, MEGA·WeTransfer 업로드 접속",
       },
       {
-        name:"다운로드 기록 (downloads 테이블)", threat:true,
-        desc:"다운로드한 파일의 URL, 저장 경로, 크기, 시작·완료 시간이 기록된다. referrer로 파일의 출처 사이트도 파악.",
-        parse_output:`[downloads 테이블]
-start_time            end_time              target_path                                          total_bytes  referrer                              state
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-2024-09-02 09:13:45   2024-09-02 09:13:46   C:\\Users\\victim\\Downloads\\방산청_협력사_공문_2024.docx  245760       http://attacker-cdn[.]com/phishing/    COMPLETE
-2024-09-02 09:31:50   2024-09-02 09:32:05   C:\\Users\\victim\\Downloads\\update_tool.exe              2457600      http://attacker-cdn[.]com/tools/       COMPLETE
-2024-09-10 21:58:00   (null)                C:\\Staging\\archive.7z                                  (partial)    (없음)                                INTERRUPTED`,
+        name:"다운로드 기록 — downloads 테이블", threat:true,
+        desc:"다운로드한 파일의 URL·저장 경로·크기·시작/완료 시간·출처 referrer 기록. 악성 파일 다운로드 경로 추적의 핵심.",
+        parse_output:`[downloads 테이블 SQL 쿼리]
+SELECT datetime(start_time/1000000-11644473600,'unixepoch') AS start_utc,
+       datetime(end_time/1000000-11644473600,'unixepoch') AS end_utc,
+       target_path, total_bytes, received_bytes,
+       tab_url, referrer, mime_type, state, danger_type
+FROM downloads ORDER BY start_time DESC;
+
+[결과]
+start_utc             end_utc               target_path                                            total_bytes  referrer                          state      danger_type
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2024-09-02 09:13:45   2024-09-02 09:13:46   C:\\Users\\victim\\Downloads\\방산청_협력사_공문_2024.docx   245760       http://attacker-cdn[.]com/phish/  COMPLETE   0  (SAFE로 분류됨)
+2024-09-02 09:31:50   2024-09-02 09:32:05   C:\\Users\\victim\\Downloads\\update_tool.exe             2457600      http://attacker-cdn[.]com/tools/  COMPLETE   1  (DANGEROUS — 사용자가 무시)
+2024-09-10 21:55:00   (null)                C:\\Staging\\research_archive.7z                         (partial)    (없음 — 직접 저장)                CANCELLED  0
+2024-09-10 22:00:00   2024-09-10 22:02:30   C:\\Staging\\research_archive.7z                         487221843    (없음)                            COMPLETE   0  ← 487MB!`,
         interpretation:[
-          { field:"target_path (저장 경로)", meaning:"파일이 저장된 경로. Downloads 폴더가 아닌 비정상 경로(Staging, Temp 등)는 공격자가 직접 지정한 것" },
-          { field:"referrer (출처 URL)", meaning:"파일을 다운로드한 페이지의 URL. 피싱 사이트, C2 서버, 악성 다운로드 페이지 특정 가능" },
-          { field:"total_bytes vs 실제 파일 크기", meaning:"다운로드 완료 크기와 MFT 파일 크기가 일치하면 동일 파일 확인. 불일치 시 중간 처리 의심" },
-          { field:"state=INTERRUPTED", meaning:"다운로드 중단. 큰 파일 업로드/다운로드 시도 흔적. partial 파일이 남아있을 수 있음" },
+          { field:"target_path (저장 경로)", meaning:"정상: Downloads 폴더. 의심: C:\\Staging, C:\\Temp, C:\\ProgramData 등 비정상 경로. 공격자가 직접 경로를 지정한 것" },
+          { field:"referrer (출처 URL)", meaning:"파일을 다운로드한 페이지. 피싱 사이트·C2 서버·악성 배포 페이지 특정. referrer가 없으면 직접 URL 입력 또는 코드로 다운로드" },
+          { field:"total_bytes vs MFT 크기", meaning:"다운로드 완료 크기와 MFT 파일 크기 비교. 일치하면 동일 파일 확인. 불일치 시 중간 처리(압축·복호화) 의심" },
+          { field:"danger_type=1 + state=COMPLETE", meaning:"브라우저가 위험 파일로 경고했지만 사용자가 강제로 다운로드 완료. 의도적 악성 파일 다운로드 증거" },
+          { field:"state=CANCELLED 후 COMPLETE", meaning:"다운로드 중단 후 재시도 패턴. 대용량 파일 업로드 실패 후 재시도" },
+          { field:"mime_type", meaning:"파일 MIME 유형. application/octet-stream (.exe 등 바이너리), application/x-7z-compressed (7z) 등으로 파일 종류 확인" },
         ],
-        forensic:"referrer URL이 공격자 인프라와 일치하면 최초 침투 경로 직접 증명. 저장 경로의 MFT 타임스탬프와 교차 확인.",
-        ioc:"Downloads 외 비정상 경로 저장, .exe .bat .ps1 파일 다운로드, 공격자 도메인 referrer",
+        forensic:"referrer URL이 공격자 인프라와 일치 → 최초 침투 경로 직접 증명. target_path 비정상 경로 + 487MB = 유출 파일 다운로드 확정.",
+        ioc:"Downloads 외 비정상 경로 저장, .exe .bat .ps1 .7z 대용량 다운로드, danger_type=1 무시, referrer = 공격자 도메인",
+      },
+      {
+        name:"검색어 & 자동완성 — keyword_search_terms·Web Data", threat:false,
+        desc:"주소창 및 검색 엔진에 입력한 검색어. 공격자가 내부에서 무엇을 검색했는지 파악 가능.",
+        parse_output:`[keyword_search_terms 테이블]
+SELECT u.url, k.term, datetime(u.last_visit_time/1000000-11644473600,'unixepoch') AS last_visit
+FROM keyword_search_terms k JOIN urls u ON k.url_id = u.id
+ORDER BY u.last_visit_time DESC;
+
+[결과]
+last_visit             url                                        term (검색어)
+----------------------------------------------------------------------
+2024-09-04 10:00:00    https://www.google.com/search?q=...        credential dump windows  ← 탈취 방법 검색!
+2024-09-04 10:02:00    https://www.google.com/search?q=...        how to bypass uac windows 10
+2024-09-04 10:05:00    https://www.google.com/search?q=...        mimikatz usage
+2024-09-05 09:00:00    https://www.google.com/search?q=...        7zip command line silent install
+
+[Web Data — autofill 테이블 (자동완성)]
+name                   value                          date_created
+------------------------------------------------------------------
+username               admin_bak                      2024-09-02  ← 백도어 계정명!
+email                  attacker@protonmail.com         2024-09-02  ← 공격자 이메일
+search_term            site:192.168.10.20              2024-09-04  ← 내부 서버 검색`,
+        interpretation:[
+          { field:"검색어 (term)", meaning:"공격자가 직접 검색한 키워드. 'credential dump', 'bypass uac', 공격 도구명 검색은 공격 의도의 직접 증거" },
+          { field:"autofill 자동완성 값", meaning:"폼에 자동완성된 계정명·이메일·비밀번호. 공격자가 사용한 계정명이나 이메일 파악" },
+          { field:"검색 시간과 이후 행동 연계", meaning:"credential dump 검색(10:00) → mimikatz 실행(10:44) = 검색으로 방법 확인 후 실행한 것" },
+        ],
+        forensic:"'how to', 'bypass', 'dump', 'exfil' 등 공격 기법 검색어 → 의도적 공격 행위. 내부 IP 검색 → 내부 자산 정찰.",
+        ioc:"credential dump, bypass uac, mimikatz, exfiltration 등 공격 키워드 검색, 내부 IP site: 검색",
+      },
+      {
+        name:"삭제된 브라우저 기록 복원", threat:false,
+        desc:"방문 기록을 삭제해도 SQLite 내부 구조(freelist·WAL)에 데이터가 잔존할 수 있다.",
+        parse_output:`[SQLite freelist 잔존 데이터 — DB Browser Recover 기능]
+삭제된 레코드 (freelist 영역에서 복원):
+visit_time_utc         url                                  title
+-------------------------------------------------------------
+2024-09-02 09:13:20    http://attacker-cdn[.]com/docs/...   문서 다운로드    ← 삭제됐지만 복원!
+2024-09-10 22:00:00    https://mega.nz/upload               MEGA
+
+[History-wal 파일에서 미커밋 트랜잭션 복원]
+# WAL 파일은 DB와 별도로 존재
+# DB + WAL 동시 열기: DB Browser에서 History 파일 열면 자동으로 WAL 병합
+# 또는: sqlite3 History "PRAGMA wal_checkpoint;" 로 강제 병합 후 분석
+
+[삭제 감지 방법]
+SELECT COUNT(*) FROM urls;   → 기록이 너무 적으면 삭제 의심
+SELECT MIN(last_visit_time) FROM urls;  → 최초 방문이 최근이면 이전 기록 삭제
+방문 기록 없는데 downloads 테이블에 파일 있음 → 방문 기록만 선택적 삭제`,
+        interpretation:[
+          { field:"SQLite freelist", meaning:"삭제된 레코드가 차지하던 페이지. 새 데이터로 덮어쓰기 전까지 데이터 잔존. DB Browser의 Recover Deleted Records 기능으로 복원 가능" },
+          { field:"WAL 파일", meaning:"Write-Ahead Log. History와 별도로 존재하는 미커밋 트랜잭션. History만 수집하고 WAL을 놓치면 최신 데이터 손실" },
+          { field:"기록 불연속성", meaning:"방문 기록의 첫 날짜가 최근이거나 중간에 공백이 있으면 선택적 삭제 의심. 공격자가 자신의 접속 흔적만 지운 것" },
+        ],
+        forensic:"삭제된 방문 기록도 freelist 복원 시도 필수. History-wal 파일은 History와 반드시 함께 수집.",
+        ioc:"방문 기록 공백 구간, downloads는 있는데 해당 시간대 urls 없음, visits 테이블 개수 비정상적으로 적음",
       },
     ],
     tips:[
+      "Chrome/Edge History 수집 시 History-wal 파일 반드시 함께 수집 (없으면 최신 데이터 누락)",
       "시크릿/InPrivate 모드 사용 시 History DB에 기록 없음 → SRUM·DNS 캐시·방화벽 로그로 보완",
-      "Chrome은 WAL(Write-Ahead Log) 사용 — History-wal 파일도 함께 가져와야 최신 데이터 확인",
-      "Hindsight로 캐시 분석 시 공격자가 방문한 페이지 일부 복원 가능",
-      "Login Data 파일: 저장된 자격증명(암호화). DPAPI 키로 복호화 가능",
-      "방문 기록 삭제해도 SQLite freelist 영역에 일부 데이터 잔존 가능성 있음",
+      "Hindsight: 캐시에서 공격자가 방문한 페이지 일부 내용 복원 가능 (이미지·텍스트 포함)",
+      "Login Data (DPAPI 암호화 자격증명): DPAPI 마스터 키 있으면 복호화 → 저장된 패스워드 확인 가능",
+      "WebKit 타임스탬프 변환 공식: (값 - 11644473600000000) / 1000000 = Unix timestamp",
+      "Firefox는 places.sqlite 사용. moz_places + moz_historyvisits JOIN으로 방문 기록 추출",
+      "DB Browser의 'Recover Deleted Records' 기능으로 freelist 영역 삭제 레코드 복원 시도",
+      "SQLite freelist 복원 불가 시 Autopsy의 SQLite Analyzer로 raw 데이터 스캔 가능",
     ],
   },
   {
     id:"srum", icon:"📊", name:"SRUM", subtitle:"System Resource Usage Monitor",
     color:"#a29bfe", category:"네트워크",
-    summary:"Windows 8 이후 도입. 모든 프로세스의 네트워크 사용량·CPU·메모리를 최대 30일간 기록하는 ESE 데이터베이스. 악성 파일이 삭제된 후에도 통신 이력과 유출량을 증명할 수 있다.",
+    summary:"Windows 8 이후 모든 프로세스의 네트워크 사용량·CPU·메모리·에너지를 최대 30일간 기록하는 ESE 데이터베이스. 악성 파일이 삭제된 후에도 프로세스 경로·통신량이 30일간 유지되어 데이터 유출 규모와 C2 통신을 정밀하게 증명할 수 있다.",
     locations:[
-      { path:"C:\\Windows\\System32\\sru\\SRUDB.dat", desc:"SRUM 메인 DB (ESE 형식)" },
-      { path:"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SRUM\\Extensions\\", desc:"SRUM 확장 설정 레지스트리" },
+      { path:"C:\\Windows\\System32\\sru\\SRUDB.dat", desc:"SRUM 메인 DB (ESE 형식 — 운영 중 잠금 상태)" },
+      { path:"C:\\Windows\\System32\\sru\\SRUDB.dat (VSS 복사본)", desc:"라이브 수집 불가 시 볼륨 섀도 복사본 활용" },
+      { path:"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SRUM\\Extensions\\{GUID}", desc:"SRUM 테이블별 GUID → 테이블 유형 매핑 레지스트리" },
+      { path:"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SRUM\\Extensions\\{DD6636C4-...}", desc:"네트워크 사용량 테이블 GUID" },
+      { path:"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SRUM\\Extensions\\{973F5D5C-...}", desc:"앱 리소스 사용량 테이블 GUID" },
     ],
     tools:[
-      { name:"SrumECmd", desc:"Eric Zimmerman SRUM 파서. 네트워크·앱 사용량 CSV 출력", cmd:"SrumECmd.exe -f SRUDB.dat --csv output\\ --csvf srum.csv" },
-      { name:"srum-dump", desc:"오픈소스 Python 파서", cmd:"python srum_dump.py SRUDB.dat -t SOFTWARE -o output.xlsx" },
+      { name:"SrumECmd", desc:"Eric Zimmerman. 네트워크·앱·에너지 테이블 CSV 출력. SOFTWARE 하이브 함께 제공 필요", cmd:"SrumECmd.exe -f SRUDB.dat -r SOFTWARE --csv output\\ --csvf srum.csv" },
+      { name:"srum-dump (Python)", desc:"오픈소스 Python 파서. Excel 출력", cmd:"python srum_dump.py SRUDB.dat -t SOFTWARE -o output.xlsx" },
+      { name:"Velociraptor", desc:"라이브 시스템에서 SRUM 원격 수집 (VSS 활용)", cmd:"velociraptor artifacts collect Windows.Forensics.SRUM" },
     ],
     keyItems:[
       {
-        name:"네트워크 사용량 ({DD6636C4-...} 테이블)", threat:true,
-        desc:"프로세스별 네트워크 송수신 바이트를 시간대별로 기록. 데이터 유출 규모와 시점을 정확히 측정.",
-        parse_output:`[네트워크 사용량 테이블]
-TimeStamp              ExeInfo                                    UserId   BytesSent    BytesRecvd   ConnectStartTime
----------------------------------------------------------------------------------------------------------------------------------
-2024-09-02 09:35:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe  S-1-5-18  1024         48620        2024-09-02 09:35:01
-2024-09-02 10:00:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe  S-1-5-18  2048         52428        2024-09-02 09:35:01
-2024-09-10 22:30:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe  S-1-5-18  487302144    12288        2024-09-10 22:30:05  ← 대용량 송신!
-2024-09-10 22:30:00    C:\\Windows\\System32\\svchost.exe             S-1-5-18  128          24576        -
-2024-09-15 03:00:00    (삭제된 파일 경로)\\svcupd.exe                S-1-5-18  1024         512          2024-09-15 02:59:00`,
+        name:"네트워크 사용량 테이블 ({DD6636C4-...})", threat:true,
+        desc:"프로세스별 네트워크 송수신 바이트를 1시간 단위로 집계 기록. 데이터 유출 규모와 C2 통신 패턴을 정밀 측정.",
+        parse_output:`[SrumECmd CSV — 네트워크 사용량 테이블]
+TimeStamp(UTC)         ExeInfo                                      UserId         BytesSent    BytesRecvd   Interface    ConnectStartTime
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+2024-09-02 09:00:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe   S-1-5-18       512          48620        Wi-Fi        2024-09-02 09:35:01
+2024-09-02 10:00:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe   S-1-5-18       1024         52428        Wi-Fi        2024-09-02 09:35:01
+2024-09-10 22:00:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe   S-1-5-18       487302144    12288        Wi-Fi        2024-09-10 22:30:05  ← 487MB 유출!
+2024-09-15 03:00:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe   S-1-5-18       1024         512          Wi-Fi        2024-09-15 02:59:00
+2024-09-16 00:00:00    (삭제된 경로)\\svcupd.exe                      S-1-5-18       512          256          Wi-Fi        -           ← 파일 삭제 후에도 기록!
+2024-09-02 09:35:00    C:\\Windows\\System32\\svchost.exe              S-1-5-20       128          24576        Wi-Fi        -
+
+[BytesSent 누적 집계]
+2024-09-02 09:35 ~ 2024-09-15 03:00  svcupd.exe 총 송신: 487,305,728 bytes (약 465 MB)
+2024-09-02 09:35 ~ 2024-09-15 03:00  svcupd.exe 총 수신: 213,992 bytes (약 209 KB)
+송신 >> 수신 = 데이터 유출 패턴 (C2 비콘은 수신>송신)`,
         interpretation:[
-          { field:"ExeInfo (실행 파일 경로)", meaning:"파일이 삭제된 후에도 경로 기록이 30일간 유지됨. 삭제된 악성 파일의 통신 이력 증명 가능" },
-          { field:"BytesSent (송신 바이트)", meaning:"외부로 전송한 데이터량. 대용량(수십~수백 MB) 송신은 데이터 유출 강력 의심. 487MB = 압축 파일 크기와 일치하면 확정" },
-          { field:"BytesRecvd (수신 바이트)", meaning:"C2에서 받은 데이터. 명령·페이로드 수신 패턴. 주기적 수신은 비콘 통신" },
-          { field:"ConnectStartTime", meaning:"TCP 연결 시작 시간. 네트워크 연결의 정확한 시작 시점 추적 가능" },
-          { field:"UserId (SID)", meaning:"해당 통신을 수행한 계정의 SID. S-1-5-18=SYSTEM 권한으로 실행된 프로세스" },
+          { field:"BytesSent 대용량 (수백 MB)", meaning:"외부로 대량 데이터 전송 = 데이터 유출. 수치가 압축 파일 크기(MFT)와 일치하면 확정 증거" },
+          { field:"BytesSent << BytesRecvd", meaning:"수신이 더 많음 = C2에서 명령·페이로드 수신. 비콘 패턴 또는 도구 다운로드" },
+          { field:"BytesSent >> BytesRecvd", meaning:"송신이 압도적 = 데이터 유출. 파일 업로드·정보 탈취 확정" },
+          { field:"ExeInfo (삭제 후에도 기록)", meaning:"파일 삭제 후에도 30일간 경로 기록 유지. 흔적 삭제 후에도 통신 이력 증명 가능" },
+          { field:"ConnectStartTime", meaning:"TCP 연결 시작의 정확한 시간. 1시간 단위 집계와 달리 분·초 단위 정밀도 제공" },
+          { field:"Interface (Wi-Fi, Ethernet, VPN)", meaning:"어떤 네트워크 인터페이스로 통신했는지. VPN이 아닌 직접 Wi-Fi 통신이면 C2 주소 노출" },
+          { field:"UserId (SID)", meaning:"S-1-5-18=SYSTEM, S-1-5-20=NetworkService. SYSTEM 권한 프로세스의 대용량 송신은 서비스형 악성코드" },
         ],
-        forensic:"BytesSent가 수백 MB인 프로세스 → 유출 주체. 유출 시간 + MFT 압축 파일 크기 + 브라우저 업로드 기록 3중 교차 검증.",
-        ioc:"svcupd.exe BytesSent: 487,302,144 bytes (09-10 22:30), 비정상 경로 프로세스 대용량 송신",
+        forensic:"BytesSent 487MB = MFT tmp_arch.7z 크기 487MB → 유출 파일 확정. 시간 + 크기 + 프로세스 3종 일치 = 법적 증거 수준.",
+        ioc:"비정상 경로 프로세스 BytesSent 수백 MB, 송신/수신 비율 극단적 불균형, C2 패턴 주기적 소량 수신",
       },
       {
-        name:"앱 리소스 사용량 ({973F5D5C-...} 테이블)", threat:false,
-        desc:"CPU·메모리·포그라운드/백그라운드 실행 시간 기록. 프로세스가 언제 얼마나 실행됐는지 파악.",
-        parse_output:`[앱 리소스 테이블]
-TimeStamp              ExeInfo                                    ForegroundCycleTime  BackgroundCycleTime  ForegroundContextSwitches
-------------------------------------------------------------------------------------------------------------------------------------------------
-2024-09-02 09:32:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe  0                    8923756281           45231    ← 백그라운드만 실행
-2024-09-02 09:31:00    C:\\Windows\\System32\\cmd.exe                 1234567890           0                    892
-2024-09-02 09:31:00    C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe  9876543210  2345678901  15432`,
+        name:"앱 리소스 사용량 테이블 ({973F5D5C-...})", threat:false,
+        desc:"CPU 사이클·포그라운드/백그라운드 실행 시간·컨텍스트 스위치. 프로세스가 언제 얼마나 실행됐는지, 사용자 몰래 실행됐는지 파악.",
+        parse_output:`[SrumECmd CSV — 앱 리소스 테이블]
+TimeStamp              ExeInfo                                      ForegroundCycleTime  BackgroundCycleTime  FGContextSwitches  BGContextSwitches
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+2024-09-02 09:32:00    C:\\ProgramData\\MicrosoftUpdate\\svcupd.exe   0                    8923756281           0                  45231  ← 백그라운드 전용!
+2024-09-10 22:28:00    C:\\Windows\\Temp\\7z.exe                       2341567890           1234500000           892                3421   ← 압축 작업 CPU 급증
+2024-09-02 09:31:00    C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe  9876543210  2345678901  15432  8903
+2024-09-02 09:31:00    C:\\Windows\\System32\\cmd.exe                  1234567890           0                    892                0
+2024-09-15 03:12:00    C:\\Windows\\System32\\cmd.exe                  987654321            0                    234                0   ← 증거 삭제용 cmd
+
+[에너지 사용량 테이블 — 보조 참고]
+TimeStamp              ExeInfo            ActiveAcTime  CsAcTime   ActiveDcTime
+2024-09-10 22:28:00    7z.exe             1823          0          0              ← 22:28 CPU 급격히 올라감`,
         interpretation:[
-          { field:"ForegroundCycleTime=0, BackgroundCycleTime 존재", meaning:"사용자 화면에 표시 없이 백그라운드에서만 실행됨. 악성코드의 전형적인 실행 패턴" },
-          { field:"CPU 사이클 시간", meaning:"높은 값 = 많은 CPU 사용. 암호화(랜섬웨어), 해시 크래킹, 대용량 파일 압축 시 높게 나타남" },
+          { field:"ForegroundCycleTime=0 + Background 존재", meaning:"사용자 화면에 표시 없이 백그라운드만 실행 = 숨겨진 악성코드 전형 패턴. 사용자가 전혀 인식 못 한 프로세스" },
+          { field:"BackgroundCycleTime 급증", meaning:"CPU를 많이 사용했지만 화면에 안 보임. 암호화(랜섬웨어), 대용량 압축, 해시 크래킹, 네트워크 스캔 시 나타남" },
+          { field:"7z.exe CPU 급증 + 네트워크 대용량 송신 시간 일치", meaning:"압축 작업 완료(CPU 감소) 직후 대용량 네트워크 송신 → 압축 후 즉시 유출 패턴 확정" },
+          { field:"FGContextSwitches=0", meaning:"포그라운드 컨텍스트 스위치 없음 = 사용자 인터랙션 전무. 완전 자동화된 백그라운드 프로세스" },
         ],
-        forensic:"ForegroundCycleTime=0인 악성 프로세스는 사용자 몰래 백그라운드 실행 중인 악성코드.",
-        ioc:"백그라운드 전용 실행(ForegroundCycleTime=0), 비정상 경로 프로세스 높은 CPU 사용",
+        forensic:"ForegroundCycleTime=0 악성 프로세스 = 사용자 몰래 실행 중. 7z CPU 급증 시간 + SRUM 대용량 송신 시간 교차 = 압축 후 즉시 유출 타임라인 확정.",
+        ioc:"ForegroundCycleTime=0 + 비정상 경로 프로세스, BackgroundCycleTime 급증 + 동일 시간 대용량 BytesSent",
+      },
+      {
+        name:"SRUM 수집 전략 & 한계", threat:false,
+        desc:"SRUM DB는 운영 중 잠금 상태이며 30일 후 자동 삭제된다. 올바른 수집 방법과 한계를 이해해야 한다.",
+        parse_output:`[SRUM 수집 방법 비교]
+
+방법 1: 오프라인 이미지 분석 (권장)
+- 이미지에서 C:\\Windows\\System32\\sru\\SRUDB.dat 직접 추출
+- SrumECmd.exe -f SRUDB.dat -r SOFTWARE --csv output\\
+- SOFTWARE 하이브 없으면 앱 이름 GUID로만 표시됨 → 반드시 함께 추출
+
+방법 2: 볼륨 섀도 복사본 (VSS)
+- vssadmin list shadows
+- \\\\?\\GLOBALROOT\\Device\\HarddiskVolumeShadowCopy1\\Windows\\System32\\sru\\SRUDB.dat
+- 라이브 분석 시 VSS에서 복사하여 분석
+
+방법 3: Velociraptor 원격 수집
+- Windows.Forensics.SRUM 아티팩트 — VSS 자동 활용
+
+[시간 제한 확인]
+현재 시간: 2024-10-01
+SRUM 보관: 30일
+→ 2024-09-01 이후 데이터만 존재
+→ 사고 발생 즉시 수집하지 않으면 이벤트 손실!
+
+[타임스탬프 주의]
+SRUM 타임스탬프는 UTC 기준 1시간 단위 버킷 집계
+ConnectStartTime만 분·초 단위 정밀도 제공
+분석 시 타임존 변환 반드시 적용`,
+        interpretation:[
+          { field:"운영 중 잠금 (ESE)", meaning:"Windows 운영 중에는 SRUDB.dat이 잠금 상태. 직접 복사 불가. 오프라인 이미지 또는 VSS 활용 필수" },
+          { field:"SOFTWARE 하이브 필요", meaning:"SrumECmd에 SOFTWARE 하이브를 함께 제공해야 GUID → 앱 이름 매핑. 없으면 {GUID} 형태로만 표시되어 분석 어려움" },
+          { field:"30일 자동 삭제", meaning:"30일 경과 데이터 자동 삭제. 사고 발생 직후 즉시 수집이 핵심. 지연 수집 시 초기 C2 통신 데이터 손실 가능" },
+          { field:"1시간 버킷 집계", meaning:"TimeStamp는 1시간 단위. 정확한 시작 시간은 ConnectStartTime 컬럼 확인. 타임라인 분석 시 주의" },
+        ],
+        forensic:"30일 제한으로 수집 타이밍이 핵심. VSS가 있다면 더 오래된 SRUM 데이터 복원 가능. SOFTWARE 하이브는 항상 함께 수집.",
+        ioc:"SRUM 첫 레코드가 너무 최근 = 이미 30일치 롤오버로 초기 데이터 손실",
       },
     ],
     tips:[
-      "SRUM은 현재 운영 중인 시스템에서는 잠금 상태 → 오프라인 분석 또는 볼륨 섀도 복사본 활용",
-      "SrumECmd 실행 시 SOFTWARE 하이브도 함께 제공해야 앱 이름 정확히 매핑됨",
-      "30일이 지난 데이터는 자동 삭제. 최대한 빠른 수집이 중요",
-      "프로세스 경로가 없는 SID 항목은 삭제된 서비스 계정이나 도메인 계정일 수 있음",
-      "타임스탬프는 UTC 기준 1시간 단위 집계. ConnectStartTime으로 정확한 시작 시간 확인",
+      "SRUDB.dat 수집 시 HKLM\\SOFTWARE 하이브도 반드시 함께 — 앱 이름 GUID 매핑에 필수",
+      "라이브 시스템: VSS(볼륨 섀도 복사본) 활용 또는 Velociraptor Windows.Forensics.SRUM 아티팩트",
+      "30일 후 자동 삭제 — 사고 접수 즉시 수집이 최우선. 하루 지연 = 하루치 데이터 손실",
+      "BytesSent 수백 MB = 유출 의심. MFT 압축 파일 크기 + 브라우저 업로드 기록과 3중 교차 검증",
+      "ForegroundCycleTime=0 프로세스 목록: 사용자 몰래 실행된 백그라운드 프로세스 전체 파악 가능",
+      "타임스탬프는 UTC 1시간 버킷. ConnectStartTime으로 정확한 연결 시작 시간 확인",
+      "프로세스 경로가 없는 SID 항목은 삭제된 서비스 계정이나 도메인 계정 — SAM·이벤트 로그와 교차",
+      "에너지 사용량 테이블({DA73FB57-...})으로 CPU 급증 시간대 특정 → 암호화·압축·덤프 작업 시점 파악",
     ],
   },
 ];
